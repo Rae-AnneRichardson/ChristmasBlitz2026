@@ -1,0 +1,1161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Christmas Blitz: a festive advent calendar of daily games.">
+<title>Christmas Blitz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Nunito:wght@400;600;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<style>
+/* Layout: a night-sky page holding a 4x4 advent calendar of wrapped presents; each present unwraps into a game card. Deliberately single-theme (Christmas night). */
+:root{
+  --night:#0b241d; --night-2:#123a2e; --pine:#1d5a43; --berry:#b8202f; --berry-deep:#7a1220;
+  --gold:#e9b949; --gold-soft:#f6dc93; --snow:#fbf7ee; --ink:#13261f; --mist:#a8c4b7; --ok:#2f8f5b; --bad:#c2333f;
+  --display:"Mountains of Christmas","Georgia",serif;
+  --body:"Nunito","Segoe UI",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--snow);margin:0}
+[hidden]{display:none!important}
+:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+body{font-family:var(--body);font-size:16px;line-height:1.5;min-height:100%;
+  background:radial-gradient(1200px 600px at 50% -10%,#1f4d3d 0%,transparent 60%),radial-gradient(800px 500px at 100% 100%,#3a0f18 0%,transparent 60%),var(--night)}
+#snow{position:fixed;inset:0;pointer-events:none;z-index:0}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
+.wrap{position:relative;z-index:1;max-width:1040px;margin:0 auto;padding-block:0 60px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.testbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:var(--gold);color:var(--ink);font-weight:800;text-align:center;padding:8px 12px;border-radius:0 0 12px 12px}
+.testbar button{margin-left:8px;background:var(--ink);color:var(--gold);border:0;border-radius:999px;padding:4px 12px;font-weight:800}
+
+.garland{display:flex;justify-content:space-between;gap:4px;height:34px;position:relative;padding-top:12px}
+.garland::before{content:"";position:absolute;left:0;right:0;top:12px;height:10px;border-bottom:2px solid #2c5b47;border-radius:0 0 50% 50%}
+.bulb{width:12px;height:18px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;margin-top:8px;animation:twinkle 2.4s infinite ease-in-out}
+.bulb:nth-child(4n+1){background:var(--berry);box-shadow:0 0 10px var(--berry)}
+.bulb:nth-child(4n+2){background:var(--gold);box-shadow:0 0 10px var(--gold);animation-delay:.6s}
+.bulb:nth-child(4n+3){background:#3fb27f;box-shadow:0 0 10px #3fb27f;animation-delay:1.2s}
+.bulb:nth-child(4n){background:#6fb6ff;box-shadow:0 0 10px #6fb6ff;animation-delay:1.8s}
+@keyframes twinkle{50%{opacity:.35;box-shadow:none}}
+
+header.hero{text-align:center;display:grid;gap:6px;padding-block:8px 22px}
+.eyebrow{font-size:.8rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-soft);font-weight:800}
+h1{font-family:var(--display);font-size:clamp(2.8rem,9vw,5.2rem);line-height:1;margin:0;color:var(--gold);
+  text-shadow:0 3px 0 var(--berry-deep),0 0 30px rgba(233,185,73,.35);text-wrap:balance}
+.sub{color:var(--mist);margin:0;max-width:60ch;justify-self:center}
+.countdown{justify-self:center;display:inline-flex;flex-wrap:wrap;justify-content:center;gap:8px 14px;align-items:center;
+  margin-top:8px;padding:10px 18px;border-radius:999px;background:rgba(0,0,0,.28);border:1px solid rgba(233,185,73,.4)}
+.countdown b{font-variant-numeric:tabular-nums;color:var(--gold);font-size:1.1rem}
+.mytotal{color:var(--gold-soft);font-weight:800}
+.note{background:rgba(184,32,47,.18);border:1px solid rgba(184,32,47,.6);padding:10px 14px;border-radius:10px;margin:0 auto 16px;max-width:720px;text-align:center}
+
+.cal{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media (max-width:720px){.cal{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}}
+.door{position:relative;aspect-ratio:1/1.08;border-radius:14px;border:0;padding:12px;display:flex;flex-direction:column;justify-content:space-between;
+  text-align:left;overflow:hidden;color:var(--snow);box-shadow:0 8px 20px rgba(0,0,0,.35),inset 0 0 0 2px rgba(255,255,255,.08);
+  transition:transform .2s ease, box-shadow .2s ease;max-width:100%}
+.door:hover{transform:translateY(-3px)}
+.p0{background:repeating-linear-gradient(45deg,var(--berry) 0 14px,#d63a48 14px 18px,var(--berry) 18px 30px,#f4ecdf 30px 34px)}
+.p1{background:radial-gradient(circle at 25% 25%,rgba(233,185,73,.55) 2.5px,transparent 3px) 0 0/22px 22px,radial-gradient(circle at 75% 75%,rgba(233,185,73,.4) 2px,transparent 2.5px) 0 0/22px 22px,var(--pine)}
+.p2{background:repeating-linear-gradient(90deg,transparent 0 18px,rgba(184,32,47,.18) 18px 22px),repeating-linear-gradient(0deg,transparent 0 18px,rgba(29,90,67,.18) 18px 22px),#e4b04a;color:var(--ink)}
+.p3{background:linear-gradient(rgba(184,32,47,.16) 50%,transparent 50%) 0 0/26px 26px,linear-gradient(90deg,rgba(29,90,67,.16) 50%,transparent 50%) 0 0/26px 26px,var(--snow);color:var(--ink)}
+.door .num{font-family:var(--display);font-size:clamp(2.4rem,7vw,3.6rem);line-height:.9;position:relative;z-index:2;text-shadow:0 2px 0 rgba(0,0,0,.25)}
+.door .date{font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;position:relative;z-index:2;opacity:.9}
+.door .gtitle{font-weight:800;font-size:.95rem;line-height:1.2;position:relative;z-index:2}
+.door .st{position:relative;z-index:2;font-size:.82rem;font-weight:800;padding:4px 10px;border-radius:999px;align-self:flex-start;
+  background:rgba(0,0,0,.35);color:var(--snow);font-variant-numeric:tabular-nums}
+.door.locked::before,.door.locked::after{content:"";position:absolute;z-index:1;opacity:.95}
+.door.locked::before{left:calc(50% - 9px);top:0;bottom:0;width:18px;background:linear-gradient(90deg,#c99a2e,var(--gold-soft),#c99a2e)}
+.door.locked::after{top:calc(50% - 9px);left:0;right:0;height:18px;background:linear-gradient(180deg,#c99a2e,var(--gold-soft),#c99a2e)}
+.door.locked .bow{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:1.8rem;z-index:2;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))}
+.door.open{outline:3px solid var(--gold);animation:glow 1.8s ease-in-out infinite}
+.door.open .st{background:var(--gold);color:var(--ink)}
+@keyframes glow{50%{box-shadow:0 0 0 6px rgba(233,185,73,.25),0 0 36px rgba(233,185,73,.55)}}
+.door.played .st{background:var(--ok)}
+.door.closed{filter:saturate(.25) brightness(.7)}
+.door.finale{background:radial-gradient(circle at 50% 35%,#fff6d0 0,#e9b949 40%,#9c6d14 100%);color:var(--ink)}
+.door.tapped{animation:tap .6s cubic-bezier(.3,1.6,.5,1) forwards;z-index:5;outline:3px solid var(--gold)}
+@keyframes tap{0%{transform:scale(1)}20%{transform:scale(1.12) rotate(-4deg)}40%{transform:scale(1.1) rotate(4deg)}60%{transform:scale(1.14) rotate(-2deg)}
+  100%{transform:scale(1.08);box-shadow:0 0 0 8px rgba(233,185,73,.35),0 0 60px 10px rgba(233,185,73,.8),0 0 120px 20px rgba(255,240,180,.5);filter:brightness(1.25)}}
+.spark{position:fixed;z-index:70;pointer-events:none;font-size:1.4rem;animation:spark .8s ease-out forwards}
+@keyframes spark{from{transform:translate(-50%,-50%) scale(.4);opacity:1}to{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.2) rotate(180deg);opacity:0}}
+.gift{filter:drop-shadow(0 0 0 rgba(233,185,73,0));animation:shake .9s ease-in-out 2,giftglow 1.2s ease-in-out infinite alternate}
+@keyframes giftglow{to{filter:drop-shadow(0 0 22px rgba(233,185,73,.9))}}
+.door[disabled]{cursor:default}
+.door[disabled]:hover{transform:none}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:center;margin-top:18px;color:var(--mist);font-size:.88rem}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.lg-open::before{background:var(--gold)} .lg-lock::before{background:var(--berry)} .lg-done::before{background:var(--ok)} .lg-miss::before{background:#666}
+.rules{margin:26px auto 0;max-width:760px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:16px 20px}
+.rules h2{font-family:var(--display);color:var(--gold);margin:0 0 6px;font-size:1.8rem}
+.rules ul{margin:0;padding-left:20px;display:grid;gap:4px}
+.pts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{display:inline-flex;gap:6px;align-items:center;padding:3px 10px;border-radius:999px;font-weight:800;font-size:.8rem;white-space:nowrap}
+.d-e{background:#2f8f5b;color:#fff}.d-m{background:#2d6fb3;color:#fff}.d-h{background:var(--berry);color:#fff}.d-x{background:var(--gold);color:var(--ink)}
+
+.modal{position:fixed;inset:0;z-index:50;background:rgba(5,15,12,.78);backdrop-filter:blur(3px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.card{position:relative;background:var(--snow);color:var(--ink);width:min(720px,100%);border-radius:18px;padding:22px 20px 24px;margin-block:auto;box-sizing:border-box;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);border-top:10px solid var(--berry);background-image:linear-gradient(180deg,rgba(29,90,67,.05),transparent 120px)}
+.card h2{font-family:var(--display);font-size:clamp(1.9rem,6vw,2.6rem);line-height:1.05;margin:0 0 4px;color:var(--berry-deep);text-wrap:balance}
+.card .kicker{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:var(--pine)}
+.xbtn{position:absolute;top:10px;right:10px;width:38px;height:38px;border-radius:50%;border:0;background:rgba(19,38,31,.08);font-size:1.4rem;color:var(--ink);z-index:5}
+.field{display:grid;gap:4px;margin-top:12px}
+.field label{font-weight:800;font-size:.9rem}
+.field input,.answer input{font:inherit;padding:11px 12px;border-radius:10px;border:2px solid #cfd8d3;background:#fff;color:var(--ink);width:100%;box-sizing:border-box}
+.field input:focus,.answer input:focus{border-color:var(--pine);outline:none}
+.err{color:var(--bad);font-weight:700;font-size:.9rem;min-height:1.2em;margin-top:6px}
+.btn{border:0;border-radius:12px;padding:12px 20px;font-weight:800;font-size:1rem;background:var(--berry);color:#fff;box-shadow:0 3px 0 var(--berry-deep)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--berry-deep)}
+.btn.alt{background:var(--pine);box-shadow:0 3px 0 #0f3627}
+.btn.ghost{background:transparent;color:var(--ink);box-shadow:none;border:2px solid #cfd8d3}
+.btn.gold{background:var(--gold);color:var(--ink);box-shadow:0 3px 0 #a07b1c}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;align-items:center}
+.facts{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}
+.facts span{background:rgba(29,90,67,.1);padding:4px 10px;border-radius:999px;font-weight:700;font-size:.85rem}
+.preview-flag{background:var(--gold);color:var(--ink);padding:6px 10px;border-radius:8px;font-weight:800;font-size:.85rem;margin-bottom:8px;margin-right:44px}
+.ghead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;margin-bottom:12px;padding-right:40px}
+.ghead .gt{font-family:var(--display);font-size:1.6rem;color:var(--berry-deep);line-height:1}
+.score-pill{background:var(--pine);color:#fff;padding:4px 12px;border-radius:999px;font-weight:800;font-variant-numeric:tabular-nums}
+.timer{position:relative;height:12px;border-radius:999px;background:#e3e9e5;overflow:hidden;margin-bottom:6px}
+.timer i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,var(--pine),#3fb27f);border-radius:999px;transition:width .25s linear}
+.timer.low i{background:linear-gradient(90deg,var(--berry),#e0525e)}
+.tleft{font-variant-numeric:tabular-nums;font-weight:800;font-size:.9rem;color:var(--pine);text-align:right}
+.qmeta{display:flex;justify-content:space-between;gap:8px;font-size:.85rem;font-weight:700;color:#4b625a;margin:6px 0}
+.prompt{font-size:1.2rem;font-weight:800;margin:6px 0 14px;text-wrap:balance}
+.prompt .big{display:block;font-size:2.6rem;letter-spacing:.1em;margin-top:6px}
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:480px){.opts{grid-template-columns:1fr}}
+.opt{text-align:left;padding:12px 14px;border-radius:12px;border:2px solid #cfd8d3;background:#fff;font-weight:700;font-size:1rem;color:var(--ink)}
+.opt:hover:not([disabled]){border-color:var(--pine)}
+.opt.right{background:#dff3e7;border-color:var(--ok)} .opt.wrong{background:#fbe1e3;border-color:var(--bad)}
+.tiles{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin:4px 0 14px}
+.word{display:flex;gap:4px}
+.tile{width:34px;height:40px;display:grid;place-items:center;border-radius:8px;background:var(--berry);color:#fff;font-weight:800;font-size:1.2rem;box-shadow:0 3px 0 var(--berry-deep)}
+.tile.gap{background:#fff;color:var(--berry);border:2px dashed var(--berry);box-shadow:none}
+@media (max-width:480px){.tile{width:26px;height:32px;font-size:1rem}}
+.answer{display:flex;gap:8px;flex-wrap:wrap}
+.answer input{flex:1 1 200px;min-width:0;text-transform:uppercase}
+.fb{min-height:1.6em;margin-top:10px;font-weight:800}
+.fb.good{color:var(--ok)} .fb.badf{color:var(--bad)}
+.muted{color:#5d7068;font-size:.9rem}
+
+/* crossword */
+.cw-wrap{display:grid;gap:14px}
+.cw-scroll{overflow-x:auto;max-width:100%}
+.cw-grid{display:grid;gap:2px;justify-content:center;margin:0 auto;width:max-content}
+.cw-cell{width:var(--cell);height:var(--cell);position:relative}
+.cw-cell input{width:100%;height:100%;box-sizing:border-box;border:2px solid var(--pine);border-radius:5px;text-align:center;text-transform:uppercase;
+  font:800 calc(var(--cell)*.5) var(--body);padding:0;background:#fff;color:var(--ink);caret-color:transparent}
+.cw-cell input:focus{background:#fff4cf;outline:none;border-color:var(--gold)}
+.cw-cell.hl input{background:#eef6f1}
+/* word guess */
+.wg-board{display:grid;gap:6px;justify-content:center;margin:6px 0}
+.wg-row{display:grid;grid-template-columns:repeat(5,min(52px,14vw));gap:6px}
+.wg-t{aspect-ratio:1;display:grid;place-items:center;border:2px solid #cfd8d3;border-radius:8px;font:800 clamp(1.1rem,5vw,1.6rem) var(--body);background:#fff;color:var(--ink);text-transform:uppercase}
+.wg-t.typed{border-color:var(--pine);animation:pop .12s ease-out}
+.wg-t.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.wg-t.near{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+.wg-t.no{background:#8a978f;border-color:#8a978f;color:#fff}
+@keyframes pop{50%{transform:scale(1.1)}}
+.wg-kb{display:grid;gap:6px;margin-top:10px}
+.wg-kr{display:flex;justify-content:center;gap:4px}
+.wg-k{flex:1 1 0;max-width:42px;min-width:0;height:46px;border:0;border-radius:6px;background:#e3e9e5;color:var(--ink);font-weight:800;font-size:.95rem;padding:0}
+.wg-k.wide{max-width:66px;flex:1.6 1 0;font-size:.8rem}
+.wg-k.ok{background:var(--ok);color:#fff}.wg-k.near{background:var(--gold)}.wg-k.no{background:#8a978f;color:#fff}
+/* sudoku */
+.sd-grid{display:grid;grid-template-columns:repeat(6,1fr);width:min(100%,360px);margin:0 auto;border:3px solid var(--ink);border-radius:8px;overflow:hidden;background:var(--ink);gap:1px}
+.sd-c{aspect-ratio:1;border:0;background:#fff;font:800 clamp(1.1rem,5vw,1.5rem) var(--body);color:var(--pine);padding:0;min-width:0}
+.sd-c.given{background:#f1ede3;color:var(--ink);cursor:default}
+.sd-c.br{box-shadow:inset -3px 0 0 var(--ink)}.sd-c.bb{box-shadow:inset 0 -3px 0 var(--ink)}.sd-c.br.bb{box-shadow:inset -3px 0 0 var(--ink),inset 0 -3px 0 var(--ink)}
+.sd-c.same{background:#e7f3ec}.sd-c.sel{background:#fff4cf;outline:3px solid var(--gold);outline-offset:-3px}.sd-c.wrong{background:#fbe1e3;color:var(--bad)}
+.sd-pad{display:flex;justify-content:center;gap:6px;margin-top:12px;flex-wrap:wrap}
+.sd-n{width:46px;height:46px;border:0;border-radius:10px;background:var(--pine);color:#fff;font-weight:800;font-size:1.2rem}
+.sd-n.erase{background:#e3e9e5;color:var(--ink)}
+.carol-hint{margin:-4px 0 12px;padding:8px 12px;border-radius:10px;background:#fff4cf;color:var(--ink);font-weight:700;font-size:.92rem;text-align:center}
+.cw-cell.ok input{background:#dff3e7;border-color:var(--ok)} .cw-cell.no input{background:#fbe1e3;border-color:var(--bad)}
+.cw-cell small{position:absolute;top:1px;left:3px;font-size:calc(var(--cell)*.27);font-weight:800;color:var(--berry);pointer-events:none;z-index:1}
+.clues{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;font-size:.92rem}
+@media (max-width:520px){.clues{grid-template-columns:1fr}}
+.clues h4{margin:0 0 4px;font-family:var(--display);font-size:1.4rem;color:var(--pine)}
+.clues ol{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.clues li{cursor:pointer;padding:2px 4px;border-radius:6px}
+.clues li.done{text-decoration:line-through;opacity:.6}
+.clues li.active{background:#fff4cf}
+
+/* word search */
+.ws-grid{display:grid;gap:3px;justify-content:center;user-select:none;margin:0 auto;max-width:100%}
+.ws-c{width:var(--cell);height:var(--cell);border-radius:6px;border:0;background:#fff;box-shadow:inset 0 0 0 1px #d8e0dc;font:800 calc(var(--cell)*.5) var(--body);color:var(--ink);padding:0}
+.ws-c.sel{background:var(--gold)} .ws-c.found{background:#bfe6cd;color:#0f3627}
+.ws-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.ws-list span{padding:3px 10px;border-radius:999px;background:rgba(29,90,67,.1);font-weight:800;font-size:.85rem}
+.ws-list span.found{text-decoration:line-through;background:#bfe6cd}
+
+/* memory */
+.mem{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-width:420px;margin:0 auto}
+.mcard{aspect-ratio:1;border-radius:12px;border:0;font-size:2rem;display:grid;place-items:center;max-width:100%;
+  background:repeating-linear-gradient(45deg,var(--berry) 0 8px,#d63a48 8px 12px);color:transparent;transition:transform .25s}
+.mcard.up,.mcard.done{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 2px #d8e0dc}
+.mcard.done{background:#dff3e7}
+
+/* find the elf */
+.scene{position:relative;width:100%;aspect-ratio:4/3;border-radius:14px;overflow:hidden;container-type:inline-size;cursor:crosshair;touch-action:manipulation;
+  background:radial-gradient(ellipse 60% 18% at 20% 62%,#fff 0 98%,transparent 100%),radial-gradient(ellipse 70% 20% at 85% 66%,#fff 0 98%,transparent 100%),
+  linear-gradient(180deg,#a9d4f0 0%,#e3f2fb 56%,#fbfdff 57%,#e8f0f4 100%);box-shadow:inset 0 0 0 2px #d8e0dc}
+.scene.night{background:radial-gradient(circle at 82% 14%,#fff8d6 0 3.2%,rgba(255,248,214,.25) 3.6% 7%,transparent 7.5%),
+  radial-gradient(ellipse 60% 18% at 20% 62%,#dfe8f0 0 98%,transparent 100%),linear-gradient(180deg,#0b1d3a 0%,#28406b 56%,#cfdbe6 57%,#a8bccd 100%)}
+.it{position:absolute;line-height:1;transform:translate(-50%,-50%) rotate(var(--r,0deg));user-select:none;pointer-events:none}
+.it.elf{pointer-events:auto;cursor:crosshair}
+.it.elf::after{content:"";position:absolute;inset:-35%}
+.it.elf.found{animation:found 1s ease-out forwards;z-index:999!important}
+@keyframes found{0%{filter:drop-shadow(0 0 0 gold)}100%{transform:translate(-50%,-50%) scale(2.2);filter:drop-shadow(0 0 8px gold) drop-shadow(0 0 16px gold)}}
+.ring{position:absolute;width:12cqw;height:12cqw;border:4px solid var(--gold);border-radius:50%;transform:translate(-50%,-50%);animation:ring 1s ease-out forwards;pointer-events:none;z-index:1000}
+@keyframes ring{from{opacity:1;width:4cqw;height:4cqw}to{opacity:0;width:24cqw;height:24cqw}}
+.miss{position:absolute;transform:translate(-50%,-50%);color:var(--bad);font-weight:800;font-size:5cqw;pointer-events:none;animation:fade 1s forwards;z-index:1000}
+@keyframes fade{to{opacity:0;transform:translate(-50%,-90%)}}
+
+/* picture puzzles */
+.pz{display:grid;grid-template-columns:minmax(0,1fr) 140px;gap:14px;align-items:start}
+@media (max-width:560px){.pz{grid-template-columns:1fr}.pz .ref{order:-1;justify-self:center;width:110px}}
+.board{display:grid;gap:3px;width:100%;max-width:440px;aspect-ratio:1;margin:0 auto;background:#e3e9e5;padding:3px;border-radius:10px;box-sizing:border-box}
+.pt{border:0;padding:0;border-radius:4px;background-repeat:no-repeat;min-width:0;min-height:0;transition:transform .15s}
+.pt.sel{outline:3px solid var(--gold);outline-offset:-3px;filter:brightness(1.15);transform:scale(.94)}
+.pt.blank{background:transparent!important;cursor:default}
+.ref{display:grid;gap:4px;font-size:.8rem;font-weight:800;color:#4b625a;text-align:center}
+.ref img{width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+
+/* result */
+.result{text-align:center;display:grid;gap:8px;justify-items:center}
+.result .big{font-family:var(--display);font-size:clamp(3rem,12vw,5rem);color:var(--berry);line-height:1}
+.result .medal{font-size:3rem}
+
+.toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(30px);opacity:0;z-index:80;
+  background:var(--gold);color:var(--ink);font-weight:800;padding:12px 20px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.4);transition:all .3s ease;max-width:calc(100% - 32px);text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* sponsor logo strip: two identical halves scroll left forever */
+.sponsors{margin-top:40px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;justify-items:center}
+.marquee{width:100%;min-width:0;overflow:hidden;background:#fff;border-radius:14px;padding:18px 0;box-shadow:0 8px 24px rgba(0,0,0,.3),inset 0 0 0 3px var(--gold);
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
+.track{display:flex;align-items:center;width:max-content;animation:marquee 34s linear infinite}
+.track img{height:54px;width:auto;max-width:none;flex:none;margin-right:64px;object-fit:contain}
+.marquee:hover .track{animation-play-state:paused}
+@keyframes marquee{to{transform:translateX(-50%)}}
+@media (max-width:600px){.track img{height:36px;margin-right:40px}.track{animation-duration:26s}}
+@media (prefers-reduced-motion:reduce){.track{flex-wrap:wrap;width:auto;justify-content:center;row-gap:16px}.track .dup{display:none}.track img{margin:0 20px}}
+/* organiser */
+.org{margin:28px auto 0;max-width:520px;display:grid;gap:10px;justify-items:center;text-align:center;border-top:1px dashed rgba(255,255,255,.18);padding-top:18px}
+.linkbtn{background:none;border:0;color:var(--mist);font-weight:700;text-decoration:underline;text-underline-offset:3px;padding:6px}
+.orgform{display:grid;gap:6px;width:100%;text-align:left}
+.orgform label{font-weight:800;font-size:.9rem;color:var(--gold-soft)}
+.orgform .err{color:#ff9aa3}
+#viewAdmin{margin-top:16px}
+.admin{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.panel{min-width:0}
+.panel{background:var(--snow);color:var(--ink);border-radius:14px;padding:16px}
+.panel h3{margin:0 0 8px;font-family:var(--display);font-size:1.7rem;color:var(--berry-deep)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat{background:#fff;border-radius:10px;padding:10px 12px;box-shadow:inset 0 0 0 1px #d8e0dc}
+.stat b{display:block;font-size:1.6rem;font-variant-numeric:tabular-nums;color:var(--pine)}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid #e1e7e3;white-space:nowrap}
+th{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:#4b625a}
+select{font:inherit;padding:9px 10px;border-radius:10px;border:2px solid #cfd8d3;background:#fff;color:var(--ink);max-width:100%}
+
+/* unwrap experience */
+.unwrap{display:grid;justify-items:center;gap:10px;padding:10px 0 4px;text-align:center;cursor:pointer;position:relative;overflow:hidden}
+.unwrap .rays{position:absolute;left:50%;top:120px;width:520px;height:520px;max-width:none;transform:translate(-50%,-50%) scale(0);border-radius:50%;
+  background:repeating-conic-gradient(rgba(233,185,73,.35) 0 10deg,transparent 10deg 20deg);animation:rays 1.6s 1.2s ease-out forwards;pointer-events:none}
+@keyframes rays{0%{transform:translate(-50%,-50%) scale(0) rotate(0);opacity:0}40%{opacity:1}100%{transform:translate(-50%,-50%) scale(1) rotate(60deg);opacity:.55}}
+.gift{position:relative;width:170px;height:170px;margin-top:40px;animation:shake .9s ease-in-out 2,giftglow 1.2s ease-in-out infinite alternate}
+.gift .box{position:absolute;inset:40px 10px 0;border-radius:8px;box-shadow:0 10px 24px rgba(0,0,0,.3)}
+.gift .lid{position:absolute;left:0;right:0;top:12px;height:38px;border-radius:8px;box-shadow:0 4px 10px rgba(0,0,0,.25);animation:lidoff 1s 1.25s cubic-bezier(.3,1.5,.6,1) forwards;z-index:3}
+.gift .rv{position:absolute;left:calc(50% - 11px);width:22px;top:40px;bottom:0;background:linear-gradient(90deg,#c99a2e,var(--gold-soft),#c99a2e);z-index:2}
+.gift .lid::after{content:"";position:absolute;left:calc(50% - 11px);width:22px;top:0;bottom:0;background:linear-gradient(90deg,#c99a2e,var(--gold-soft),#c99a2e)}
+.gift .gbow{position:absolute;left:50%;top:-20px;transform:translateX(-50%);font-size:3rem;z-index:4;animation:bowoff 1s 1.15s ease-in forwards}
+.gift .pop{position:absolute;left:50%;top:40px;transform:translate(-50%,0) scale(0);font-size:3.4rem;z-index:1;animation:popup .8s 1.6s cubic-bezier(.3,1.6,.5,1) forwards}
+@keyframes shake{0%,100%{transform:rotate(0)}15%{transform:rotate(-7deg) scale(1.03)}30%{transform:rotate(6deg)}45%{transform:rotate(-5deg)}60%{transform:rotate(4deg) scale(1.05)}75%{transform:rotate(-2deg)}}
+@keyframes lidoff{to{transform:translate(70px,-150px) rotate(38deg);opacity:0}}
+@keyframes bowoff{to{transform:translate(-160px,-120px) rotate(-60deg);opacity:0}}
+@keyframes popup{to{transform:translate(-50%,-80px) scale(1.2)}}
+.unwrap .reveal{opacity:0;transform:translateY(12px) scale(.9);animation:reveal .6s 1.9s ease-out forwards;position:relative;z-index:2}
+.unwrap .reveal h2{margin:0}
+@keyframes reveal{to{opacity:1;transform:none}}
+.unwrap .skip{font-size:.8rem;color:#5d7068;margin-top:4px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="snow" aria-hidden="true"></canvas>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="wrap">
+  <div class="testbar" id="testbar" hidden>🧪 Test mode: every door is open and nothing is recorded <button id="testOff">Turn off</button></div>
+  <div class="garland" aria-hidden="true" id="garland"></div>
+  <header class="hero">
+    <div class="eyebrow">Advent challenge · 18 Nov – 5 Dec 2026</div>
+    <h1>Christmas Blitz</h1>
+    <p class="sub">A new present unwraps every day. Each one holds a quick festive game, open from 8am to 8pm in your own time zone. Get answers right to earn Nectar points.</p>
+    <div class="countdown" id="countdown">Loading the calendar…</div>
+  </header>
+  <div class="note" id="note" hidden></div>
+  <main id="viewCal">
+    <div class="cal" id="cal"></div>
+    <div class="legend"><span class="lg-open">Open today</span><span class="lg-lock">Still wrapped</span><span class="lg-done">Played</span><span class="lg-miss">Missed (closed for good)</span></div>
+    <section class="rules">
+      <h2>How it works</h2>
+      <ul>
+        <li>One door opens each day at <b>8am</b> and closes at <b>8pm</b>, in your own time zone. There are no games on Sundays.</li>
+        <li>Enter your full name and department before every game.</li>
+        <li>Questions are shared out so the people playing before and after you get a different set.</li>
+        <li>You get 30 seconds for each question. Puzzles have one short timer. You get one go per door.</li>
+        <li>A missed door stays closed. You can't go back to it.</li>
+        <li>Every game is worth 50 to 200 Nectar points. Harder games are worth more. Get at least one answer right to earn the minimum 50.</li>
+        <li>Winners are crowned on Saturday 5 December.</li>
+      </ul>
+      <div class="pts"><span class="chip d-e">Easy game · up to 100</span><span class="chip d-m">Medium game · up to 150</span><span class="chip d-h">Hard game · up to 200</span></div>
+    </section>
+  </main>
+  <section class="sponsors" aria-label="Our companies">
+    <div class="marquee">
+      <div class="track">
+        <img src="logos/ramps-logistics.webp" alt="RAMPS Logistics"><img src="logos/el-dorado-offshore.webp" alt="El Dorado Offshore"><img src="logos/cubby-cargo.webp" alt="Cubby Cargo"><img src="logos/mawi.webp" alt="MAWI"><img src="logos/evolve.webp" alt="Evolve"><img src="logos/prosource-building-supplies.jpg" alt="ProSource Building Supplies"><img class="dup" src="logos/ramps-logistics.webp" alt="" aria-hidden="true"><img class="dup" src="logos/el-dorado-offshore.webp" alt="" aria-hidden="true"><img class="dup" src="logos/cubby-cargo.webp" alt="" aria-hidden="true"><img class="dup" src="logos/mawi.webp" alt="" aria-hidden="true"><img class="dup" src="logos/evolve.webp" alt="" aria-hidden="true"><img class="dup" src="logos/prosource-building-supplies.jpg" alt="" aria-hidden="true">
+      </div>
+    </div>
+  </section>
+  <footer class="org">
+    <button class="linkbtn" id="orgOpen" aria-expanded="false">🔒 Organiser login</button>
+    <form id="orgForm" class="orgform" hidden novalidate>
+      <label for="orgCode">Organiser code</label>
+      <div class="answer"><input id="orgCode" type="password" autocomplete="off" placeholder="Enter code"><button class="btn gold">Unlock</button></div>
+      <div class="err" id="orgErr"></div>
+    </form>
+    <button class="linkbtn" id="orgLock" hidden>Lock organiser view</button>
+  </footer>
+  <section id="viewAdmin" hidden></section>
+</div>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="card">
+    <button class="xbtn" id="mClose" aria-label="Close">×</button>
+    <div id="mBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ================= CONFIG ================= */
+const REWARD="Nectar points";
+const HOME_TZ="America/Port_of_Spain";   // organiser reports use Trinidad & Tobago time
+const MIN_PTS=50;
+const LEVEL={e:{label:"Easy",max:100,cls:"d-e"},m:{label:"Medium",max:150,cls:"d-m"},h:{label:"Hard",max:200,cls:"d-h"}};
+const DIFF={e:{label:"Easy",w:1,cls:"d-e"},m:{label:"Medium",w:2,cls:"d-m"},h:{label:"Hard",w:3,cls:"d-h"},x:{label:"Expert",w:4,cls:"d-x"}};
+// Each door is open from 8am to 8pm in the PLAYER'S OWN time zone on its date.
+const DOORS=[
+ {n:1, date:"2026-11-18",type:"unscramble",pool:"words",     level:"e",title:"Elf Word Scramble",          blurb:"Unscramble festive words before the elves finish wrapping.",time:120,count:8},
+ {n:2, date:"2026-11-19",type:"quiz",      pool:"trivia",    level:"m",title:"Festive Trivia Sprint",      blurb:"Quick-fire Christmas trivia. Tap the right answer.",time:120,count:8},
+ {n:3, date:"2026-11-20",type:"crossword", pool:"cwXmas",    level:"e",title:"Christmas Mini Crossword",   blurb:"A friendly crossword with everyday Christmas words. Tap a clue to jump to it.",time:240},
+ {n:4, date:"2026-11-21",type:"quiz",      pool:"tf",        level:"e",title:"Fact or Fruitcake?",         blurb:"True or false? Trust your festive gut.",time:0,count:10},
+ {n:5, date:"2026-11-23",type:"quiz",      pool:"emoji",     level:"m",title:"Emoji Movie Night",          blurb:"Name the Christmas film from its emojis.",time:120,count:8},
+ {n:6, date:"2026-11-24",type:"wordsearch",pool:"ws",        level:"e",title:"Snowflake Word Search",      blurb:"Find the hidden words. Tap the first letter, then the last.",time:180},
+ {n:7, date:"2026-11-25",type:"jigsaw",    pool:"j4",        level:"m",title:"Christmas Card Jigsaw",      blurb:"The Christmas card is in pieces. Tap two pieces to swap them until the picture is whole.",time:180},
+ {n:8, date:"2026-11-26",type:"quiz",      pool:"carib",     level:"m",title:"Pepperpot & Parang Quiz",   blurb:"Parang, pepperpot, ponche de crème and more. How well do you know Christmas at home?",time:120,count:8},
+ {n:9, date:"2026-11-27",type:"crossword", pool:"cwCarib",   level:"m",title:"Parang & Pastelles Crossword",blurb:"A crossword full of our favourite Christmas things.",time:240},
+ {n:10,date:"2026-11-28",type:"wordguess", pool:"wg",        level:"h",title:"Festive Word Guess",         blurb:"Guess the hidden 5-letter Christmas word in 6 tries. Green means right letter, right spot. Gold means it is in the word but somewhere else. Two words to crack!",time:0},
+ {n:11,date:"2026-11-30",type:"memory",    pool:"mem",       level:"e",title:"Santa's Memory Match",       blurb:"Flip the cards and match every pair.",time:120},
+ {n:12,date:"2026-12-01",type:"sudoku",    pool:"sd",        level:"h",title:"Christmas Sudoku",           blurb:"A 6×6 sudoku. Fill every row, column and box with the numbers 1 to 6.",time:0},
+ {n:13,date:"2026-12-02",type:"carol",     pool:"carols",    level:"m",title:"Carol Title Gaps",           blurb:"The vowels have gone missing from each carol or Christmas song title. Type the WHOLE title, not just the missing letters. For example, for S_L_NT N_GHT, type SILENT NIGHT.",time:150,count:8},
+ {n:14,date:"2026-12-03",type:"crossword", pool:"cwKitchen", level:"m",title:"Christmas Kitchen Crossword",blurb:"Everything cooking for the holidays.",time:240},
+ {n:15,date:"2026-12-04",type:"finale",    pool:"mix",       level:"h",title:"Grand Finale Mega Mix",      blurb:"Trivia, emojis, odd-one-outs, scrambles and more. Go big!",time:180},
+];
+const WINNERS={date:"2026-12-05"};
+const PAPERS=["p0","p1","p2","p3"];
+// Timing: question-style games give 30 s per question (or per elf scene); puzzles get one short overall timer (seconds).
+const PERQ={quiz:1,unscramble:1,carol:1,finale:1,findelf:1};
+const PUZZLE_TIME={crossword:180,wordsearch:150,memory:90,jigsaw:120,slide:150,wordguess:240,sudoku:300};
+DOORS.forEach(d=>{if(d.type==="finale")d.count=10;if(d.type==="findelf")d.count=5;d.time=PERQ[d.type]?d.count*32+5:PUZZLE_TIME[d.type]});
+
+/* ================= CONTENT POOLS (Caribbean & US audience) ================= */
+// [question, correct, wrong1, wrong2, wrong3, difficulty]
+const TRIVIA=[
+ ["Which reindeer has a glowing red nose?","Rudolph","Comet","Dasher","Cupid","e"],
+ ["Where was Jesus born?","Bethlehem","Nazareth","Jerusalem","Galilee","e"],
+ ["Who sings 'All I Want for Christmas Is You'?","Mariah Carey","Whitney Houston","Beyoncé","Rihanna","e"],
+ ["Who sang the hit 'Feliz Navidad'?","José Feliciano","Ricky Martin","Marc Anthony","Enrique Iglesias","m"],
+ ["What do children traditionally leave out for Santa?","Milk and cookies","Tea and cake","Juice and chips","Soda and pizza","e"],
+ ["What is the name of the Grinch's dog?","Max","Buddy","Rex","Spot","m"],
+ ["In Home Alone, where are the McCallisters flying to?","Paris","London","Rome","Miami","m"],
+ ["What date is Boxing Day?","26 December","24 December","27 December","1 January","e"],
+ ["How many reindeer pull Santa's sleigh, including Rudolph?","9","8","7","12","m"],
+ ["What is the snowman called in Frozen?","Olaf","Sven","Kristoff","Frosty","e"],
+ ["What colour is the Grinch?","Green","Blue","Red","Purple","e"],
+ ["Which saint is Santa Claus based on?","St Nicholas","St Patrick","St George","St Andrew","m"],
+ ["What were the three gifts of the Wise Men?","Gold, frankincense & myrrh","Gold, silver & bronze","Myrrh, spices & silk","Frankincense, pearls & gold","e"],
+ ["Where does Santa live?","The North Pole","The South Pole","Iceland","Canada","e"],
+ ["How many gifts are given in total in 'The Twelve Days of Christmas'?","364","78","144","12","x"],
+ ["In which country was 'Silent Night' first sung?","Austria","Germany","England","Spain","x"],
+ ["Who wrote 'A Christmas Carol' with Ebenezer Scrooge?","Charles Dickens","Mark Twain","Dr Seuss","Roald Dahl","m"],
+ ["Who wrote 'How the Grinch Stole Christmas!'?","Dr Seuss","Roald Dahl","Charles Dickens","Walt Disney","m"],
+ ["What colour are Santa's suit and hat?","Red and white","Green and gold","Blue and white","Black and red","e"],
+ ["In 'The Night Before Christmas', not a creature was stirring, not even a…","Mouse","Cat","Dog","Bird","m"],
+ ["What shape is a candy cane?","A shepherd's crook (J)","A star","A circle","A bell","e"],
+ ["Which department store hosts the famous Thanksgiving Day Parade?","Macy's","Walmart","Target","Sears","m"],
+ ["How many points does a snowflake have?","6","5","8","4","h"],
+ ["Which spirit gives black cake its kick?","Rum","Gin","Vodka","Tequila","e"],
+];
+const CARIB=[
+ ["Which music fills the air at Christmas time?","Parang","Polka","Bluegrass","Flamenco","e"],
+ ["Sorrel, the ruby-red Christmas drink, is made from which part of the plant?","The flowers","The roots","The bark","The seeds","m"],
+ ["What is ponche de crème?","A creamy rum punch","A fruit cake","A pastelle filling","A parang song","e"],
+ ["Pastelles are wrapped in which leaf before steaming?","Banana leaf","Cabbage leaf","Grape leaf","Corn husk","m"],
+ ["Which small four-string guitar is a must in a parang band?","Cuatro","Ukulele","Banjo","Mandolin","m"],
+ ["Which famous Christmas stew is made with cassareep?","Pepperpot","Callaloo","Pelau","Oil down","e"],
+ ["Garlic pork, the Christmas breakfast favourite, was brought over by which people?","The Portuguese","The Dutch","The French","The Chinese","h"],
+ ["Ponche de crème is made with rum, milk and…","Eggs","Coconut","Chocolate","Ginger","m"],
+ ["What is the Christmas ham traditionally glazed with?","Pineapple, cloves and sugar","Ketchup","Pepper sauce","Mustard only","m"],
+ ["Besides the cuatro, which string instrument is strummed in a parang band?","Guitar","Violin","Harp","Cello","h"],
+ ["Which festive drink is made from ginger root, sugar and lime?","Ginger beer","Sorrel","Mauby","Eggnog","e"],
+ ["In which city is the famous Rockefeller Center Christmas tree?","New York","Chicago","Miami","Los Angeles","e"],
+ ["Which holiday on the fourth Thursday of November kicks off the Christmas season for many?","Thanksgiving","Labor Day","Memorial Day","Halloween","e"],
+ ["Before Christmas, many families hang new…","Curtains","Fences","Mailboxes","Doors","e"],
+ ["Parang singers going from house to house is called a…","Parranda","Fete","J'ouvert","Lime","h"],
+ ["Black cake gets its dark colour from rum-soaked fruit and…","Browning (burnt sugar)","Chocolate","Coffee","Food colouring","h"],
+ ["Which public holiday comes the day after Christmas?","Boxing Day","Old Year's Day","Emancipation Day","Arrival Day","e"],
+ ["What do we call New Year's Eve?","Old Year's Night","Last Lime","Year End Fete","Big Night","m"],
+ ["'Drink a Rum' is a Christmas classic by which calypsonian?","Lord Kitchener","Mighty Sparrow","David Rudder","Machel Montano","h"],
+ ["Christmas sweet bread is made with grated…","Coconut","Carrot","Pumpkin","Cassava","m"],
+ ["Parang songs are traditionally sung in which language?","Spanish","French","English","Dutch","e"],
+ ["Which spice is grated on top of ponche de crème?","Nutmeg","Cinnamon","Pepper","Ginger","m"],
+ ["Pelau is cooked with rice, meat and which peas?","Pigeon peas","Green peas","Chickpeas","Black-eyed peas","m"],
+ ["Colourful Christmas street dancers with drums and flutes are known as…","Masquerade bands","Steel bands","Tassa drummers","Choirs","h"],
+];
+const EMOJI=[
+ ["🏠👦🔑🚫✈️","Home Alone","e"],["🧝‍♂️🍝🏙️🎄","Elf","e"],["💚😠🎄🏔️","The Grinch","e"],["🚂❄️🎫🔔","The Polar Express","m"],
+ ["⛄❄️👸👸","Frozen","e"],["🐸🐷👻📜","The Muppet Christmas Carol","m"],["🏢🔫🎄💥","Die Hard","h"],
+ ["🏡🔁💕✈️","The Holiday","h"],["🎅🚀🎁👦","Arthur Christmas","h"],["💀🎃➡️🎄","The Nightmare Before Christmas","m"],
+ ["✉️📮🧸🎅","Klaus","x"],["🔔👼🌉💫","It's a Wonderful Life","x"],["👓🔫👦🥧","A Christmas Story","x"],["🕺💪🧸🛍️","Jingle All the Way","h"],
+ ["🎅📜⚖️🏛️","Miracle on 34th Street","h"],["🐭👑🩰🎄","The Nutcracker","m"],["🎅🔄👨‍💼🏠","The Santa Clause","m"],["👨‍👩‍👧‍👦🚗🎄💡","Christmas Vacation","h"],
+];
+const TF=[
+ ["Sorrel is made from the flower of a hibiscus plant.",true,"m"],["Parang is sung mainly in Spanish.",true,"e"],
+ ["Pepperpot is cooked with cassareep.",true,"m"],["Thanksgiving is celebrated in December.",false,"e"],
+ ["The Rockefeller Center Christmas tree is in Washington DC.",false,"e"],["Sorrel is usually served ice-cold.",false,"m"],
+ ["Boxing Day is a public holiday.",true,"e"],["Pastelles are wrapped in banana leaves.",true,"e"],
+ ["Rudolph the Red-Nosed Reindeer was created for a department store.",true,"h"],["Every snowflake has eight sides.",false,"e"],
+ ["Candy canes were originally all white.",true,"h"],["Female reindeer keep their antlers through the winter.",true,"h"],
+ ["The Grinch's heart grows three sizes in one day.",true,"m"],["Penguins live at the North Pole.",false,"e"],
+ ["Mistletoe berries are poisonous to humans.",true,"m"],["'Feliz Navidad' means 'Happy New Year'.",false,"e"],
+ ["Garlic pork is a Christmas breakfast tradition.",true,"m"],["Ponche de crème is made without eggs.",false,"m"],
+ ["St Nicholas lived in what is now Turkey.",true,"x"],["Electric Christmas lights were first used in the 1880s.",true,"x"],
+];
+// [options, answer, explanation, difficulty]
+const ODD=[
+ [["Dasher","Comet","Blitzen","Rover"],"Rover","Rover isn't one of Santa's reindeer.","e"],
+ [["Parang","Calypso","Soca","Polka"],"Polka","The others are home-grown music styles.","e"],
+ [["Pepperpot","Garlic pork","Black cake","Pizza"],"Pizza","The others are Christmas favourites at home.","e"],
+ [["Sorrel","Ponche de crème","Ginger beer","Coffee"],"Coffee","The others are Christmas drinks.","e"],
+ [["Elf","Home Alone","The Polar Express","Jaws"],"Jaws","Jaws isn't a Christmas film.","e"],
+ [["Black cake","Sweet bread","Pastelle","Croissant"],"Croissant","The others are on the table at Christmas.","e"],
+ [["Cuatro","Maracas","Box bass","Trumpet"],"Trumpet","The others are classic parang instruments.","h"],
+ [["Gold","Frankincense","Myrrh","Silver"],"Silver","Silver wasn't one of the Wise Men's gifts.","m"],
+ [["Melchior","Caspar","Balthazar","Gabriel"],"Gabriel","Gabriel is an angel, not one of the Wise Men.","h"],
+ [["Prancer","Vixen","Donner","Thumper"],"Thumper","Thumper is Bambi's rabbit friend.","m"],
+ [["Thanksgiving","Christmas","Boxing Day","Easter"],"Easter","Easter isn't in the holiday season.","e"],
+ [["Pastelle","Pelau","Macaroni pie","Hot dog"],"Hot dog","The others are Christmas table favourites at home.","m"],
+ [["Mariah Carey","José Feliciano","Lord Kitchener","Bob Marley"],"Bob Marley","The others all have famous Christmas songs.","h"],
+];
+const WORDS=["SANTA","PARANG","SORREL","PASTELLE","GIFTS","LIGHTS","ANGEL","STAR","MANGER","CHURCH","CAROL","CANDLE","RIBBON","REINDEER","SNOWMAN","PRESENTS","CURTAINS","CUATRO","MARACAS","NATIVITY","WREATH","STOCKING","TINSEL","ORNAMENT","HOLIDAY","JINGLE","CHIMNEY","PEPPERPOT","SWEETBREAD","CELEBRATE"];
+const FOOD=["HAM","PASTELLE","SORREL","BLACK CAKE","SWEET BREAD","GINGER BEER","PEPPERPOT","GARLIC PORK","PELAU","TURKEY","EGGNOG","FRUIT CAKE","COOKIES","MACARONI PIE","PONCHE DE CREME"];
+const FILMS=["HOME ALONE","ELF","THE GRINCH","THE POLAR EXPRESS","THE HOLIDAY","KLAUS","ARTHUR CHRISTMAS","JINGLE ALL THE WAY","FROZEN","DIE HARD","THE SANTA CLAUSE","CHRISTMAS VACATION","THE NUTCRACKER"];
+const CAROLS=["SILENT NIGHT","JINGLE BELLS","DECK THE HALLS","AWAY IN A MANGER","O HOLY NIGHT","JOY TO THE WORLD","THE FIRST NOEL","WE THREE KINGS","O COME ALL YE FAITHFUL","HARK THE HERALD ANGELS SING","O LITTLE TOWN OF BETHLEHEM","WE WISH YOU A MERRY CHRISTMAS","FROSTY THE SNOWMAN","LET IT SNOW","WINTER WONDERLAND","LITTLE DRUMMER BOY","FELIZ NAVIDAD","DRINK A RUM","MARYS BOY CHILD","JINGLE BELL ROCK","SANTA CLAUS IS COMING TO TOWN","RUDOLPH THE RED NOSED REINDEER","ALL I WANT FOR CHRISTMAS IS YOU","THE CHRISTMAS SONG"];
+// Crosswords: short, everyday words with friendly clues.
+const CW={
+ cwXmas:[["STAR","Shines on top of the tree"],["GIFT","Present under the tree"],["SANTA","Jolly man in a red suit"],["ELF","Santa's little helper"],["BELLS","Jingle ___"],["TREE","You decorate it with lights"],["ANGEL","Heavenly tree-topper"],["CAROL","Christmas song sung together"],["LIGHTS","They twinkle on the house"],["RIBBON","Tied around a present"],["CANDLE","Burns with a little flame"],["MANGER","Baby Jesus' bed"],["CHURCH","Midnight Mass is held here"],["TINSEL","Sparkly tree garland"],["WREATH","Ring of greenery on the door"],["REINDEER","They pull Santa's sleigh"],["COOKIES","Left out for Santa with milk"]],
+ cwCarib:[["PARANG","Spanish-style Christmas music sung house to house"],["SORREL","Ruby-red Christmas drink"],["PASTELLE","Cornmeal parcel in a banana leaf"],["HAM","Glazed Christmas meat"],["CURTAINS","New ones go up before Christmas"],["PEPPERPOT","Christmas stew made with cassareep"],["GINGER","___ beer"],["CUATRO","Small four-string parang guitar"],["MARACAS","Shakers in a parang band"],["RUM","Spirit in black cake"],["PAINT","Many homes get a fresh coat before Christmas"],["LIME","A casual get-together with friends"],["NUTMEG","Grated on ponche de crème"],["CAKE","Black ___"],["PELAU","One-pot rice and pigeon peas"],["SANTA","He visits on Christmas Eve"]],
+ cwKitchen:[["TURKEY","Thanksgiving and Christmas bird"],["RICE","Pelau is made with it"],["PEAS","Pigeon ___"],["GRAVY","Pour it over your dinner"],["EGGNOG","Creamy festive drink"],["COOKIES","Left out for Santa"],["PIE","Macaroni ___"],["BREAD","Sweet ___"],["SUGAR","Makes the cake sweet"],["MILK","Santa's drink"],["COCONUT","In sweet bread"],["HAM","Sliced at Christmas lunch"],["ONION","Chopped for the stuffing"],["OVEN","Where the cake bakes"],["APPLE","Fruit in a pie"],["SPICE","Cinnamon or nutmeg"]],
+};
+const WS=["SANTA","ELVES","GIFTS","CAROL","ANGEL","STAR","BELLS","TREE","LIGHTS","PARANG","SORREL","HAM","CUATRO","CANDLE","WREATH","JOLLY","MERRY","NOEL","CAKE","PELAU","RIBBON","CHEER"];
+const MEM=["🎄","🎅","🤶","⛄","🦌","🎁","🔔","⭐","🕯️","🍪","🧦","❄️","🍬","🎀","🛷","🥥"];
+
+/* ================= UTILITIES ================= */
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const rnd=n=>Math.floor(Math.random()*n);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a}
+const pick=(a,n)=>shuffle(a.slice()).slice(0,n);
+function seeded(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function seededShuffle(a,seed){const r=seeded(seed);a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+// Deal: player number k for this door takes the next n items from a fixed per-door order, so consecutive players get different sets.
+function deal(arr,n,k,seed){const p=seededShuffle(arr,seed),out=[],start=(k*n)%p.length;for(let i=0;i<Math.min(n,p.length);i++)out.push(p[(start+i)%p.length]);return shuffle(out)}
+const norm=s=>String(s).toUpperCase().replace(/[^A-Z0-9]/g,"");
+const lenDiff=s=>{const L=norm(s).length;return L<=5?"e":L<=7?"m":L<=9?"h":"x"};
+const chip=d=>`<span class="chip ${DIFF[d].cls}">${DIFF[d].label}</span>`;
+// Doors are open 8am–8pm in the player's own local time on their date.
+const OPEN_HOUR=8,CLOSE_HOUR=20;
+DOORS.forEach(d=>{const[y,m,dd]=d.date.split("-").map(Number);d.open=new Date(y,m-1,dd,OPEN_HOUR).getTime();d.close=new Date(y,m-1,dd,CLOSE_HOUR).getTime()});
+{const[y,m,dd]=WINNERS.date.split("-").map(Number);WINNERS.open=new Date(y,m-1,dd,OPEN_HOUR).getTime()}
+const stateOf=(d,t=Date.now())=>t<d.open?"locked":t<d.close?"open":"closed";
+function fmtDur(ms){ms=Math.max(0,ms);const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;
+  const p=n=>String(n).padStart(2,"0");return d>0?`${d}d ${h}h ${p(m)}m`:`${p(h)}:${p(m)}:${p(x)}`}
+const dayLabel=t=>new Date(t).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
+const homeTime=t=>t?new Date(t).toLocaleString("en-GB",{timeZone:HOME_TZ,day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
+const myTZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||""}catch(e){return""}})();
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+let toastT;function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),2200)}
+function scrambleWord(w){if(w.length<2||new Set(w).size<2)return w;let s;do{s=shuffle(w.split("")).join("")}while(s===w);return s}
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ================= STATE / BACKEND (Supabase) ================= */
+const CFG=window.BLITZ_CONFIG||{};
+const BACKEND=!!(CFG.supabaseUrl&&CFG.supabaseKey&&!/YOUR-/.test(CFG.supabaseUrl+CFG.supabaseKey));
+const S={all:[],active:null,adminDoor:"all",testMode:false,adminUnlocked:false,adminCode:null,loadErr:"",loadedAt:0,local:{}};
+try{S.local=JSON.parse(localStorage.getItem("blitz.plays")||"{}")||{}}catch(e){S.local={}}
+function saveLocal(){try{localStorage.setItem("blitz.plays",JSON.stringify(S.local))}catch(e){}}
+function myPlay(n){return S.local["d"+n]}
+function setLocal(n,rec){S.local["d"+n]=rec;saveLocal()}
+function canPlay(){return BACKEND}
+const deviceId=(()=>{let id=lsGet("blitz.device");if(!id){id=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now()+"-"+Math.random().toString(36).slice(2);lsSet("blitz.device",id)}return id})();
+// Calls a Supabase database function through the public REST endpoint.
+async function rpc(fn,args){
+  const headers={"Content-Type":"application/json",apikey:CFG.supabaseKey};
+  if(/^eyJ/.test(CFG.supabaseKey))headers.Authorization="Bearer "+CFG.supabaseKey;
+  const r=await fetch(CFG.supabaseUrl.replace(/\/+$/,"")+"/rest/v1/rpc/"+fn,{method:"POST",headers,body:JSON.stringify(args)});
+  const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch(e){}
+  if(!r.ok){const e=new Error((j&&(j.message||j.hint))||("Error "+r.status));e.status=r.status;throw e}
+  return j;
+}
+function showNote(t){const n=$("#note");n.textContent=t;n.hidden=false}
+function hideNote(){$("#note").hidden=true}
+function initBackend(){if(!BACKEND)showNote("Scores can't be saved yet. The organiser still needs to connect the scoreboard (config.js).")}
+
+/* ================= CALENDAR ================= */
+function paperOf(d){const i=d.n-1;return PAPERS[(i*3+Math.floor(i/4))%4]}
+function renderCal(){
+  const now=Date.now();
+  const html=DOORS.map(d=>{
+    const st=stateOf(d,now),p=myPlay(d.n);let cls=`door ${paperOf(d)} `,status="",inner="",dis=false;
+    if(p&&p.status){cls+="played";status=p.status==="finished"?`✓ ${p.score} pts`:"✓ Played";inner=`<span class="gtitle">${esc(d.title)}</span>`}
+    else if(st==="locked"){cls+="locked";status=`Opens in ${fmtDur(d.open-now)}`;inner=`<span class="bow" aria-hidden="true">🎀</span>`;dis=true}
+    else if(st==="open"){cls+="open";status="Open now · tap to play";inner=`<span class="gtitle">${esc(d.title)}</span>`}
+    else{cls+="closed";status="Missed · closed";inner=`<span class="gtitle">${esc(d.title)}</span>`;dis=true}
+    if(S.testMode)dis=false;
+    return `<button class="${cls}" data-n="${d.n}" ${dis?"disabled":""} aria-label="Door ${d.n}, ${dayLabel(d.open)}: ${esc(status)}">
+      <span><span class="num">${d.n}</span><br><span class="date">${dayLabel(d.open)}</span></span>${inner}<span class="st" data-cd="${d.n}">${esc(status)}</span></button>`;
+  }).join("");
+  const wl=now<WINNERS.open;
+  $("#cal").innerHTML=html+`<button class="door finale ${wl?"":"open"}" disabled aria-label="Winners day">
+    <span><span class="num">★</span><br><span class="date">${dayLabel(WINNERS.open)}</span></span><span class="gtitle">Winners' Grotto</span>
+    <span class="st">${wl?"Winners crowned 5 Dec":"🏆 Winners crowned today!"}</span></button>`;
+  renderCountdown();
+}
+function myTotal(){let t=0;for(const d of DOORS){const p=myPlay(d.n);if(p&&p.score)t+=p.score}return t}
+function renderCountdown(){
+  const now=Date.now(),open=DOORS.find(d=>stateOf(d,now)==="open"),next=DOORS.find(d=>now<d.open);let t;
+  if(open)t=`<span>🎁 Door ${open.n} is open</span><span>Closes in <b>${fmtDur(open.close-now)}</b></span>`;
+  else if(next)t=`<span>🎄 Door ${next.n} opens in</span><b>${fmtDur(next.open-now)}</b>`;
+  else t=`<span>🏆 The calendar is complete. Thank you for playing!</span>`;
+  const tot=myTotal();if(tot>0)t+=`<span class="mytotal">Your total: ${tot} ${REWARD}</span>`;
+  $("#countdown").innerHTML=t;
+}
+let lastSig="";
+setInterval(()=>{
+  const now=Date.now(),sig=DOORS.map(d=>stateOf(d,now)).join()+(now<WINNERS.open);
+  if(sig!==lastSig){lastSig=sig;renderCal();return}
+  DOORS.forEach(d=>{const el=document.querySelector(`[data-cd="${d.n}"]`);if(el&&!myPlay(d.n)&&stateOf(d,now)==="locked")el.textContent=`Opens in ${fmtDur(d.open-now)}`});
+  renderCountdown();
+},1000);
+$("#cal").addEventListener("click",e=>{const b=e.target.closest(".door[data-n]");if(!b||b.disabled||b.classList.contains("tapped"))return;
+  const d=DOORS[+b.dataset.n-1],go=()=>{b.classList.remove("tapped");openDoor(d,S.testMode)};
+  if(reduce){go();return}
+  b.classList.add("tapped");const r=b.getBoundingClientRect();
+  ["✨","⭐","✨","🌟","✨","❄️","✨","⭐","🎉","✨"].forEach((s,i)=>{const sp=document.createElement("span");sp.className="spark";sp.textContent=s;
+    const a=i/10*Math.PI*2,dist=60+rnd(50);sp.style.left=(r.left+r.width/2)+"px";sp.style.top=(r.top+r.height/2)+"px";
+    sp.style.setProperty("--dx",Math.cos(a)*dist+"px");sp.style.setProperty("--dy",Math.sin(a)*dist+"px");document.body.appendChild(sp);setTimeout(()=>sp.remove(),850)});
+  setTimeout(go,650)});
+
+/* ================= UNWRAP EXPERIENCE ================= */
+const GAME_ICON={unscramble:"🔤",quiz:"❓",crossword:"✏️",wordsearch:"🔍",memory:"🃏",carol:"🎶",finale:"🏆",findelf:"🧝",jigsaw:"🧩",slide:"⛄",wordguess:"🔠",sudoku:"🔢"};
+let actx;
+function chime(){try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();
+  [784,988,1175,1568,1976].forEach((f,i)=>{const o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f;
+    const t=actx.currentTime+1.2+i*.11;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.1,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+1.1);
+    o.connect(g).connect(actx.destination);o.start(t);o.stop(t+1.2)})}catch(e){}}
+// Game-show style "wrong answer" buzzer: two slightly detuned square waves, softened by a low-pass filter.
+function buzzer(){try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume();
+  const t=actx.currentTime,g=actx.createGain(),f=actx.createBiquadFilter();f.type="lowpass";f.frequency.value=900;
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.18,t+.02);g.gain.setValueAtTime(.18,t+.4);g.gain.exponentialRampToValueAtTime(.0001,t+.55);
+  f.connect(g).connect(actx.destination);[110,117].forEach(fr=>{const o=actx.createOscillator();o.type="square";o.frequency.value=fr;o.connect(f);o.start(t);o.stop(t+.58)})}catch(e){}}
+function playUnwrap(d){return new Promise(res=>{
+  if(reduce){res();return}
+  const paper=paperOf(d);
+  mBody.innerHTML=`<div class="unwrap" id="uw"><div class="rays"></div>
+    <div class="gift"><div class="pop">${GAME_ICON[d.type]||"🎁"}</div><div class="box ${paper}"></div><div class="rv"></div><div class="lid ${paper}"></div><div class="gbow">🎀</div></div>
+    <div class="reveal"><div class="kicker">Door ${d.n} · ${dayLabel(d.open)}</div><h2 id="mTitle">${esc(d.title)}</h2></div><div class="skip">Tap to skip</div></div>`;
+  chime();const t1=setTimeout(burst,1550),t2=setTimeout(done,3300);
+  function done(){clearTimeout(t1);clearTimeout(t2);res()}
+  $("#uw").onclick=done;
+})}
+
+/* ================= MODAL / REGISTRATION ================= */
+const modal=$("#modal"),mBody=$("#mBody");
+function openModal(){modal.hidden=false;document.body.style.overflow="hidden"}
+function closeModal(){modal.hidden=true;document.body.style.overflow="";S.active=null;renderCal()}
+$("#mClose").addEventListener("click",()=>{
+  if(S.active&&!S.active.done){
+    if(S.active.preview){S.active.stop();closeModal();return}
+    if(document.getElementById("leaveBar"))return;
+    const bar=document.createElement("div");bar.id="leaveBar";bar.className="note";bar.style.cssText="background:#fbe1e3;color:var(--ink);border-color:var(--bad);margin:0 44px 12px 0";
+    bar.innerHTML=`Leave now? Your score so far will be submitted and you can't replay this door.<div class="row" style="justify-content:center"><button class="btn ghost" id="stay">Keep playing</button><button class="btn" id="leave">Submit and leave</button></div>`;
+    mBody.prepend(bar);$("#stay").onclick=()=>bar.remove();$("#leave").onclick=()=>{bar.remove();S.active.quit()};
+    return;
+  }
+  closeModal();
+});
+const flag=preview=>preview?`<div class="preview-flag">Test mode · this game is not recorded</div>`:"";
+async function openDoor(d,preview,other){
+  openModal();
+  if(!preview){
+    if(stateOf(d)!=="open"){mBody.innerHTML=`<h2 id="mTitle">Door ${d.n} is closed</h2><p>This door can only be played on ${dayLabel(d.open)}, between 8am and 8pm your time. Missed doors stay closed.</p>`;return}
+    const p=other?null:myPlay(d.n);
+    if(p){mBody.innerHTML=`<div class="kicker">Door ${d.n} · ${dayLabel(d.open)}</div><h2 id="mTitle">${esc(d.title)}</h2>
+      <p>You've already played this door${p.status==="finished"?` and earned <b>${p.score} ${REWARD}</b>`:""}. Come back tomorrow for the next present!</p>
+      <div class="row"><button class="btn ghost" id="otherPerson">I'm someone else using this device</button></div>`;$("#otherPerson").onclick=()=>openDoor(d,false,true);return}
+    if(!canPlay()){mBody.innerHTML=`<h2 id="mTitle">Almost ready</h2><p>The scoreboard isn't connected yet, so games can't be saved. Please check back soon.</p>`;return}
+  }
+  await playUnwrap(d);
+  if(modal.hidden)return;
+  const L=LEVEL[d.level],name=lsGet("blitz.name")||"",dept=lsGet("blitz.dept")||"";
+  mBody.innerHTML=`${flag(preview)}<div class="kicker">Door ${d.n} · ${dayLabel(d.open)}</div><h2 id="mTitle">${esc(d.title)}</h2>
+    <p style="margin:4px 0">${esc(d.blurb)}</p>
+    <div class="facts"><span class="chip ${L.cls}">${L.label} game</span><span>⭐ ${MIN_PTS}–${L.max} ${REWARD}</span><span>⏱ ${PERQ[d.type]?`${QSEC} seconds per ${d.type==="findelf"?"scene":"question"}`:`${Math.round(d.time/6)/10} min timer`}</span><span>1 attempt</span></div>
+    <form id="reg" novalidate>
+      <div class="field"><label for="fName">Full name</label><input id="fName" autocomplete="name" placeholder="e.g. Jane Smith" value="${esc(name)}"></div>
+      <div class="field"><label for="fDept">Department</label><input id="fDept" autocomplete="organization-title" placeholder="e.g. Customer Service" value="${esc(dept)}"></div>
+      <div class="err" id="regErr"></div>
+      <div class="row"><button class="btn" type="submit">Start the game ▶</button><span class="muted">The timer starts straight away.</span></div>
+    </form>`;
+  $("#reg").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const n=$("#fName").value.trim().replace(/\s+/g," "),dp=$("#fDept").value.trim().replace(/\s+/g," "),err=$("#regErr");
+    if(n.split(" ").filter(x=>x.length>=2).length<2){err.textContent="Please enter your full name (first and last name).";$("#fName").focus();return}
+    if(dp.length<2){err.textContent="Please enter your department.";$("#fDept").focus();return}
+    lsSet("blitz.name",n);lsSet("blitz.dept",dp);
+    const btn=e.target.querySelector("button");btn.disabled=true;btn.textContent="Getting your questions…";
+    let k=rnd(1000),token=null;
+    const reset=()=>{btn.disabled=false;btn.textContent="Start the game ▶"};
+    if(!preview){
+      try{
+        const res=await rpc("start_play",{p_name:n,p_dept:dp,p_door:d.n,p_tz:myTZ,p_device:deviceId});
+        if(!res||!res.ok){const why=res&&res.reason;reset();
+          if(why==="played"){err.textContent=`Our records show ${n} has already played door ${d.n}. Everyone gets one go per door.`;setLocal(d.n,{status:"started",score:0});renderCal()}
+          else if(why==="closed")err.textContent="This door isn't open right now. Each door is open from 8am to 8pm (your time) on its day.";
+          else err.textContent="Please check your full name and department and try again.";
+          return}
+        k=res.k;token=res.token;setLocal(d.n,{status:"started",score:0,token});
+      }catch(ex){err.textContent="We couldn't reach the scoreboard. Check your internet connection and try again.";reset();return}
+    }
+    startGame(d,{name:n,dept:dp,token},preview,k);
+  });
+}
+
+/* ================= GAME RUNNER ================= */
+// Points: a game is worth up to LEVEL.max. Each right answer earns its share (weighted by difficulty).
+// Any right answer guarantees at least MIN_PTS for the game; the total never exceeds the game's max.
+function startGame(d,who,preview,k){
+  const L=LEVEL[d.level];
+  mBody.innerHTML=`${flag(preview)}<div class="ghead"><span class="gt" id="mTitle">${esc(d.title)}</span><span class="score-pill" id="pts">0 pts</span></div>
+    <div class="timer" id="tbar"><i style="width:100%"></i></div><div class="tleft" id="tleft"></div><div id="garea"></div>`;
+  const area=$("#garea"),t0=Date.now(),total=d.time*1000;let finished=false,earnedW=0,running=0,game;
+  const award=(w,silent)=>{earnedW+=w;const share=Math.max(1,Math.round(L.max*w/(game&&game.W||1)));running=Math.min(L.max,running+share);
+    $("#pts").textContent=`${running} pts`;if(!silent)toast(`🎉 Correct! +${share} ${REWARD}`);return share};
+  game=GAMES[d.type](area,d,award,res=>finish(res,true),k);
+  if(game.ownTimer){$("#tbar").hidden=true;$("#tleft").hidden=true}
+  const iv=setInterval(tick,250);tick();
+  function tick(){const left=Math.max(0,total-(Date.now()-t0));$("#tbar i").style.width=(left/total*100)+"%";$("#tbar").classList.toggle("low",left<20000);
+    $("#tleft").textContent=`${fmtDur(left).slice(3)} left`;if(left<=0)finish(game.state(),false)}
+  function finish(res,complete){
+    if(finished)return;finished=true;clearInterval(iv);game.stop&&game.stop();S.active.done=true;
+    const frac=res.frac!=null?res.frac:(game.W?earnedW/game.W:0);
+    const points=frac>0?Math.min(L.max,Math.max(MIN_PTS,Math.round(L.max*frac))):0;
+    const taken=Math.round(Math.min(d.time,(Date.now()-t0)/1000));
+    const rec={door:d.n,game:d.title,name:who.name,dept:who.dept,tz:myTZ,status:"finished",score:points,correct:res.correct,total:res.total,timeTaken:taken,
+      startedAt:(myPlay(d.n)||{}).startedAt||t0,finishedAt:Date.now()};
+    const medal=frac>=1?"🏆":frac>=.5?"⭐":"🎄";
+    mBody.innerHTML=`${flag(preview)}<div class="result"><div class="medal">${medal}</div><div class="kicker">${complete?"All done!":"Time's up!"}</div>
+      <h2 id="mTitle">${esc(d.title)}</h2><div class="big">${points}</div><div><b>${REWARD}</b> earned · ${res.correct} of ${res.total} ${esc(res.unit||"correct")} · ${taken}s</div>
+      <p class="muted">${points>0?`Congratulations ${esc(who.name.split(" ")[0])}, you just earned ${points} ${REWARD}!`:"No points this time, but there's a new present tomorrow!"}</p>
+      <div class="err" id="saveErr"></div><div class="row" style="justify-content:center"><button class="btn alt" id="backCal">Back to the calendar</button></div></div>`;
+    $("#backCal").onclick=closeModal;burst();if(points>0)toast(`🎁 You just earned ${points} ${REWARD}!`);
+    if(!preview){setLocal(d.n,{status:"finished",score:points,token:who.token});const save=()=>rpc("finish_play",{p_token:who.token,p_score:points,p_correct:res.correct,p_total:res.total,p_time:taken}).then(()=>{const e=$("#saveErr");if(e)e.textContent=""}).catch(()=>{const e=$("#saveErr");if(e){e.innerHTML=`Your score didn't save. <button class="btn ghost" id="retry">Try again</button>`;$("#retry").onclick=save}});save()}
+  }
+  S.active={preview,done:false,stop:()=>{finished=true;clearInterval(iv);game.stop&&game.stop()},quit:()=>finish(game.state(),false)};
+}
+
+/* ---------- question games ---------- */
+function mcq(q,ans,wrongs,diff,extra={}){return{kind:"mcq",prompt:q,options:shuffle([ans,...wrongs]),answer:ans,diff,...extra}}
+function buildQuestions(d,k){
+  const s=d.n*1009;
+  const triv=(arr,n,salt=0)=>deal(arr,n,k,s+salt).map(r=>mcq(r[0],r[1],r.slice(2,5),r[5]));
+  const emo=(n,salt=0)=>deal(EMOJI,n,k,s+salt).map(([e,a,df])=>mcq("Which Christmas film is this?",a,pick(EMOJI.filter(x=>x[1]!==a).map(x=>x[1]),3),df,{big:e}));
+  const tf=(n,salt=0)=>deal(TF,n,k,s+salt).map(([q,v,df])=>({kind:"mcq",prompt:q,options:["True","False"],answer:v?"True":"False",diff:df,label:"Fact or fruitcake?"}));
+  const odd=(n,salt=0)=>deal(ODD,n,k,s+salt).map(([o,a,note,df])=>({kind:"mcq",prompt:"Which is the odd one out?",options:shuffle(o.slice()),answer:a,note,diff:df}));
+  const uns=(arr,n,label,salt=0)=>deal(arr,n,k,s+salt).map(w=>({kind:"type",label,prompt:"Unscramble:",tiles:w.split(" ").map(scrambleWord),answer:w,diff:lenDiff(w)}));
+  switch(d.pool){
+    case"trivia":return triv(TRIVIA,d.count);
+    case"carib":return triv(CARIB,d.count);
+    case"tf":return tf(d.count);
+    case"food":return uns(FOOD,d.count,"Christmas dinner");
+    case"emoji":return emo(d.count);
+    case"words":return uns(WORDS,d.count,"Christmas word");
+    case"carols":return deal(CAROLS,d.count,k,s).map(t=>({kind:"type",label:"Carol or song title",prompt:"Which carol or song is this?",hint:"Type the whole title, e.g. SILENT NIGHT, not just the missing letters.",placeholder:"Type the whole title",tiles:t.split(" "),gaps:true,answer:t,diff:lenDiff(t)}));
+    case"mix":{const hard=r=>r[5]!=="e";return shuffle([...triv(TRIVIA.filter(hard),2,1),...triv(CARIB.filter(hard),1,2),...emo(1,3),...tf(2,4),...odd(2,5),...uns(FOOD,1,"Christmas food",6),...uns(FILMS,1,"Christmas film",7)])}
+  }
+}
+// 30-second countdown for each question / scene. Renders into #qbar/#qleft; calls onExpire once at zero.
+const QSEC=30;
+function qClock(onExpire){const end=Date.now()+QSEC*1000;let iv=setInterval(()=>{const left=Math.max(0,end-Date.now()),b=$("#qbar");if(!b){clearInterval(iv);return}
+    b.querySelector("i").style.width=(left/(QSEC*10))+"%";b.classList.toggle("low",left<10000);$("#qleft").textContent=`${Math.ceil(left/1000)}s left`;
+    if(left<=0){clearInterval(iv);onExpire()}},200);return()=>clearInterval(iv)}
+const qBarHTML=`<div class="timer" id="qbar"><i style="width:100%"></i></div><div class="tleft" id="qleft">${QSEC}s left</div>`;
+function quizGame(area,d,award,done,k){
+  const qs=buildQuestions(d,k);let i=0,correct=0,stopped=false,tm,stopClock=()=>{};
+  function show(){
+    if(stopped)return;if(i>=qs.length){done({correct,total:qs.length});return}
+    const q=qs[i];let body;
+    if(q.kind==="mcq")body=`<div class="opts">${q.options.map(o=>`<button class="opt" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
+    else{const tiles=q.tiles.map(w=>`<div class="word">${w.split("").map(c=>q.gaps&&/[AEIOU]/.test(c)?`<span class="tile gap">_</span>`:`<span class="tile">${esc(c)}</span>`).join("")}</div>`).join("");
+      body=`<div class="tiles" aria-label="Letters">${tiles}</div>${q.hint?`<p class="carol-hint">✍️ ${esc(q.hint)}</p>`:""}<form class="answer" id="af"><input id="ans" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${esc(q.placeholder||"Type your answer")}" aria-label="${esc(q.placeholder||"Your answer")}"><button class="btn alt">Check</button><button class="btn ghost" type="button" id="skip">Skip</button></form>`}
+    area.innerHTML=`${qBarHTML}<div class="qmeta"><span>Question ${i+1} of ${qs.length}${q.label?" · "+esc(q.label):""}</span>${chip(q.diff)}</div>
+      <div class="prompt">${esc(q.prompt)}${q.big?`<span class="big">${q.big}</span>`:""}</div>${body}<div class="fb" id="fb" aria-live="polite"></div>`;
+    if(q.kind==="mcq")area.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{area.querySelectorAll(".opt").forEach(x=>{x.disabled=true;if(x.dataset.v===q.answer)x.classList.add("right")});
+      const ok=b.dataset.v===q.answer;if(!ok)b.classList.add("wrong");resolve(ok,q)});
+    else{const inp=$("#ans");inp.focus();const lock=()=>{inp.disabled=true;area.querySelectorAll("#af button").forEach(b=>b.disabled=true)};
+      $("#af").onsubmit=e=>{e.preventDefault();if(!inp.value.trim())return;lock();resolve(norm(inp.value)===norm(q.answer),q)};
+      $("#skip").onclick=()=>{lock();resolve(false,q)}}
+    stopClock=qClock(()=>{area.querySelectorAll(".opt").forEach(x=>{x.disabled=true;if(x.dataset.v===q.answer)x.classList.add("right")});
+      area.querySelectorAll("#af input,#af button").forEach(x=>x.disabled=true);resolve(false,q,true)});
+  }
+  function resolve(ok,q,timedOut){if(q.done)return;q.done=true;stopClock();const fb=$("#fb");
+    if(ok){correct++;const p=award(DIFF[q.diff].w);fb.className="fb good";fb.textContent=`Correct! +${p} ${REWARD}${q.note?" · "+q.note:""}`}
+    else{buzzer();fb.className="fb badf";fb.textContent=`${timedOut?"Time's up!":"Not quite."} The answer was ${q.answer}.${q.note?" "+q.note:""}`}
+    tm=setTimeout(()=>{i++;show()},ok?900:1600)}
+  show();
+  return{ownTimer:true,W:qs.reduce((a,q)=>a+DIFF[q.diff].w,0),state:()=>({correct,total:qs.length}),stop(){stopped=true;clearTimeout(tm);stopClock()}};
+}
+
+/* ---------- crossword ---------- */
+function buildCrossword(pool,target=7){
+  let best=null;
+  for(let attempt=0;attempt<60;attempt++){
+    const words=shuffle(pool.map(([w,c])=>({word:w,clue:c})));words.sort((a,b)=>b.word.length-a.word.length);const first=words.splice(rnd(3),1)[0];shuffle(words);
+    const grid=new Map(),dirs=new Map(),placed=[];const K=(r,c)=>r+","+c;
+    const put=(w,r,c,dir)=>{const[dr,dc]=dir==="a"?[0,1]:[1,0];for(let i=0;i<w.word.length;i++){const k=K(r+dr*i,c+dc*i);grid.set(k,w.word[i]);dirs.set(k,(dirs.get(k)||"")+dir)}placed.push({...w,r,c,dir})};
+    const fits=(word,r,c,dir)=>{const[dr,dc]=dir==="a"?[0,1]:[1,0];
+      if(grid.has(K(r-dr,c-dc))||grid.has(K(r+dr*word.length,c+dc*word.length)))return-1;let cross=0;
+      for(let i=0;i<word.length;i++){const rr=r+dr*i,cc=c+dc*i,k=K(rr,cc),ex=grid.get(k);
+        if(ex){if(ex!==word[i]||(dirs.get(k)||"").includes(dir))return-1;cross++}
+        else if(dir==="a"?(grid.has(K(rr-1,cc))||grid.has(K(rr+1,cc))):(grid.has(K(rr,cc-1))||grid.has(K(rr,cc+1))))return-1}
+      return cross>0?cross:-1};
+    put(first,0,0,Math.random()<.5?"a":"d");
+    for(const w of words){if(placed.length>=target)break;const opts=[];
+      for(let i=0;i<w.word.length;i++)for(const[k,ch]of grid){if(ch!==w.word[i])continue;const[r,c]=k.split(",").map(Number);
+        for(const dir of["a","d"]){const sr=dir==="d"?r-i:r,sc=dir==="a"?c-i:c,f=fits(w.word,sr,sc,dir);if(f>0)opts.push({r:sr,c:sc,dir,f})}}
+      if(opts.length){const mx=Math.max(...opts.map(o=>o.f));const o=pick(opts.filter(o=>o.f===mx),1)[0];put(w,o.r,o.c,o.dir)}}
+    const ks=[...grid.keys()].map(k=>k.split(",").map(Number)),rs=ks.map(x=>x[0]),cs=ks.map(x=>x[1]);
+    const h=Math.max(...rs)-Math.min(...rs)+1,wd=Math.max(...cs)-Math.min(...cs)+1,score=placed.length*100-Math.max(h,wd)*3;
+    if(Math.max(h,wd)<=12&&(!best||score>best.score))best={placed,minR:Math.min(...rs),minC:Math.min(...cs),h,wd,score};
+    if(best&&best.placed.length>=target&&attempt>10)break;
+  }
+  const{placed,minR,minC,h,wd}=best;placed.forEach(p=>{p.r-=minR;p.c-=minC});
+  const starts=[...new Set(placed.map(p=>p.r*100+p.c))].sort((a,b)=>a-b);placed.forEach(p=>p.num=starts.indexOf(p.r*100+p.c)+1);
+  return{placed,rows:h,cols:wd};
+}
+function crosswordGame(area,d,award,done){
+  const cw=buildCrossword(CW[d.pool],6),cells=new Map();let dir="a",activeWord=null;
+  cw.placed.forEach((p,wi)=>{for(let i=0;i<p.word.length;i++){const r=p.r+(p.dir==="d"?i:0),c=p.c+(p.dir==="a"?i:0),k=r+","+c;
+    const cell=cells.get(k)||{r,c,ch:p.word[i],words:[]};cell.words.push(wi);if(i===0)cell.num=p.num;cells.set(k,cell)}});
+  const solved=new Set();
+  const cl=dd=>cw.placed.map((p,wi)=>({p,wi})).filter(x=>x.p.dir===dd).sort((a,b)=>a.p.num-b.p.num)
+    .map(({p,wi})=>`<li data-w="${wi}"><b>${p.num}.</b> ${esc(p.clue)} (${p.word.length}) ${chip(lenDiff(p.word))}</li>`).join("");
+  let g="";for(let r=0;r<cw.rows;r++)for(let c=0;c<cw.cols;c++){const k=r+","+c,cell=cells.get(k);
+    g+=cell?`<div class="cw-cell" data-k="${k}">${cell.num?`<small>${cell.num}</small>`:""}<input maxlength="1" aria-label="Row ${r+1} column ${c+1}" autocomplete="off"></div>`:`<div class="cw-cell"></div>`}
+  area.innerHTML=`<div class="cw-wrap"><p class="muted" style="margin:0">Tap a square or a clue, then type. Tap a square twice to switch between across and down.</p>
+    <div class="cw-scroll"><div class="cw-grid" id="cwg" style="grid-template-columns:repeat(${cw.cols},var(--cell))">${g}</div></div>
+    <div class="clues"><div><h4>Across</h4><ol>${cl("a")}</ol></div><div><h4>Down</h4><ol>${cl("d")}</ol></div></div>
+    <div class="row" style="margin-top:0"><button class="btn alt" id="cwCheck">Check my answers</button><button class="btn" id="cwDone">I'm finished</button></div>
+    <div class="fb" id="fb" aria-live="polite"></div></div>`;
+  const avail=Math.min(area.clientWidth||320,600),size=Math.max(24,Math.min(40,Math.floor((avail-cw.cols*2)/cw.cols)));
+  $("#cwg").style.setProperty("--cell",size+"px");
+  const inp=k=>area.querySelector(`[data-k="${k}"] input`);
+  const wordCells=wi=>{const p=cw.placed[wi];return[...Array(p.word.length)].map((_,i)=>(p.r+(p.dir==="d"?i:0))+","+(p.c+(p.dir==="a"?i:0)))};
+  function highlight(wi){activeWord=wi;area.querySelectorAll(".cw-cell.hl").forEach(x=>x.classList.remove("hl"));area.querySelectorAll(".clues li").forEach(l=>l.classList.toggle("active",+l.dataset.w===wi));
+    if(wi!=null)wordCells(wi).forEach(k=>area.querySelector(`[data-k="${k}"]`).classList.add("hl"))}
+  const pickWord=k=>{const cell=cells.get(k),w=cell.words.find(wi=>cw.placed[wi].dir===dir);return w!=null?w:cell.words[0]};
+  function checkWords(){cw.placed.forEach((p,wi)=>{if(solved.has(wi))return;if(wordCells(wi).every(k=>inp(k).value.toUpperCase()===cells.get(k).ch)){
+      solved.add(wi);award(DIFF[lenDiff(p.word)].w);area.querySelector(`li[data-w="${wi}"]`).classList.add("done")}})}
+  area.querySelectorAll(".cw-cell input").forEach(el=>{const k=el.parentElement.dataset.k;
+    el.addEventListener("focus",()=>{const cell=cells.get(k);if(!cell.words.some(wi=>cw.placed[wi].dir===dir))dir=cw.placed[cell.words[0]].dir;highlight(pickWord(k))});
+    el.addEventListener("pointerdown",()=>{const cell=cells.get(k);if(cell.words.length>1&&document.activeElement===el){dir=dir==="a"?"d":"a";setTimeout(()=>highlight(pickWord(k)))}});
+    el.addEventListener("input",()=>{if(el.readOnly)return;el.value=el.value.slice(-1).toUpperCase().replace(/[^A-Z]/g,"");
+      if(el.value){const[r,c]=k.split(",").map(Number),nk=dir==="a"?r+","+(c+1):(r+1)+","+c;if(cells.has(nk))inp(nk).focus()}
+      checkWords();if(solved.size===cw.placed.length)done({correct:solved.size,total:cw.placed.length,unit:"words"})});
+    el.addEventListener("keydown",e=>{const[r,c]=k.split(",").map(Number),mv={ArrowRight:[0,1],ArrowLeft:[0,-1],ArrowDown:[1,0],ArrowUp:[-1,0]}[e.key];
+      if(mv){const nk=(r+mv[0])+","+(c+mv[1]);if(cells.has(nk)){e.preventDefault();dir=mv[0]?"d":"a";inp(nk).focus()}}
+      if(!mv&&el.readOnly&&/^[a-z]$/i.test(e.key)){e.preventDefault();const nk=dir==="a"?r+","+(c+1):(r+1)+","+c;if(cells.has(nk)){const n=inp(nk);n.focus();if(!n.readOnly){n.value=e.key.toUpperCase();n.dispatchEvent(new Event("input"))}}return}
+      if(e.key==="Backspace"&&!el.value){const pk=dir==="a"?r+","+(c-1):(r-1)+","+c;if(cells.has(pk)){e.preventDefault();if(!inp(pk).readOnly)inp(pk).value="";inp(pk).focus()}}})});
+  area.querySelectorAll(".clues li").forEach(li=>li.onclick=()=>{const wi=+li.dataset.w;dir=cw.placed[wi].dir;const ks=wordCells(wi);inp(ks.find(k=>!inp(k).value)||ks[0]).focus()});
+  $("#cwCheck").onclick=()=>{checkWords();area.querySelectorAll(".cw-cell[data-k]").forEach(div=>{const v=div.querySelector("input").value.toUpperCase();div.classList.remove("ok","no");if(v)div.classList.add(v===cells.get(div.dataset.k).ch?"ok":"no")});
+    if(area.querySelector(".cw-cell.no"))buzzer();
+    setTimeout(()=>area.querySelectorAll(".cw-cell.no,.cw-cell.ok").forEach(x=>x.classList.remove("ok","no")),1500);$("#fb").textContent=`${solved.size} of ${cw.placed.length} words solved.`};
+  $("#cwDone").onclick=()=>{checkWords();done({correct:solved.size,total:cw.placed.length,unit:"words"})};
+  return{W:cw.placed.reduce((a,p)=>a+DIFF[lenDiff(p.word)].w,0),state:()=>{checkWords();return{correct:solved.size,total:cw.placed.length,unit:"words"}},stop(){area.querySelectorAll("input,button").forEach(x=>x.disabled=true)}};
+}
+
+/* ---------- word search ---------- */
+function wordsearchGame(area,d,award,done){
+  const N=10,words=pick(WS,8),grid=[...Array(N)].map(()=>Array(N).fill("")),place=[],DIRS=[[0,1],[1,0],[1,1],[-1,1]];
+  for(const w of words){for(let t=0;t<200;t++){const[dr,dc]=DIRS[rnd(4)],r=rnd(N),c=rnd(N),er=r+dr*(w.length-1),ec=c+dc*(w.length-1);
+      if(er<0||er>=N||ec<0||ec>=N)continue;let ok=true;for(let i=0;i<w.length;i++){const ch=grid[r+dr*i][c+dc*i];if(ch&&ch!==w[i]){ok=false;break}}
+      if(!ok)continue;for(let i=0;i<w.length;i++)grid[r+dr*i][c+dc*i]=w[i];place.push({w,r,c,dr,dc,found:false});break}}
+  const AL="ABCDEFGHIJKLMNOPRSTUWY";for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(!grid[r][c])grid[r][c]=AL[rnd(AL.length)];
+  area.innerHTML=`<p class="muted" style="margin:0 0 8px">Tap the first letter of a word, then its last letter.</p>
+    <div class="ws-grid" id="wsg" style="grid-template-columns:repeat(${N},var(--cell))">${grid.flatMap((row,r)=>row.map((ch,c)=>`<button class="ws-c" data-r="${r}" data-c="${c}" aria-label="${ch}, row ${r+1} column ${c+1}">${ch}</button>`)).join("")}</div>
+    <div class="ws-list">${place.map((p,i)=>`<span data-i="${i}">${p.w}</span>`).join("")}</div><div class="fb" id="fb" aria-live="polite"></div>`;
+  const avail=Math.min(area.clientWidth||320,460);$("#wsg").style.setProperty("--cell",Math.max(26,Math.min(42,Math.floor((avail-N*3)/N)))+"px");
+  let start=null,found=0;const btn=(r,c)=>area.querySelector(`.ws-c[data-r="${r}"][data-c="${c}"]`);
+  const endOf=p=>[p.r+p.dr*(p.w.length-1),p.c+p.dc*(p.w.length-1)];
+  $("#wsg").addEventListener("click",e=>{const b=e.target.closest(".ws-c");if(!b)return;const r=+b.dataset.r,c=+b.dataset.c;
+    if(!start){start={r,c};b.classList.add("sel");return}
+    btn(start.r,start.c).classList.remove("sel");const s=start;start=null;if(s.r===r&&s.c===c)return;
+    const hit=place.find(p=>{if(p.found)return false;const[er,ec]=endOf(p);return(p.r===s.r&&p.c===s.c&&er===r&&ec===c)||(p.r===r&&p.c===c&&er===s.r&&ec===s.c)});
+    const fb=$("#fb");
+    if(hit){hit.found=true;found++;for(let i=0;i<hit.w.length;i++)btn(hit.r+hit.dr*i,hit.c+hit.dc*i).classList.add("found");
+      area.querySelector(`.ws-list [data-i="${place.indexOf(hit)}"]`).classList.add("found");const p=award(DIFF[lenDiff(hit.w)].w);fb.className="fb good";fb.textContent=`Found ${hit.w}! +${p} ${REWARD}`;
+      if(found===place.length)setTimeout(()=>done({correct:found,total:place.length,unit:"words found"}),600)}
+    else{buzzer();fb.className="fb badf";fb.textContent="That's not one of the words. Try again."}});
+  return{W:place.reduce((a,p)=>a+DIFF[lenDiff(p.w)].w,0),state:()=>({correct:found,total:place.length,unit:"words found"}),stop(){area.querySelectorAll("button").forEach(x=>x.disabled=true)}};
+}
+
+/* ---------- memory ---------- */
+function memoryGame(area,d,award,done){
+  const icons=pick(MEM,8),deck=shuffle([...icons,...icons]);let open=[],pairs=0,busy=false,stopped=false;
+  area.innerHTML=`<p class="muted" style="margin:0 0 10px">Match all 8 pairs before the timer runs out.</p>
+    <div class="mem">${deck.map((ic,i)=>`<button class="mcard" data-i="${i}" aria-label="Hidden card">${ic}</button>`).join("")}</div><div class="fb" id="fb" aria-live="polite"></div>`;
+  area.querySelector(".mem").addEventListener("click",e=>{const b=e.target.closest(".mcard");if(!b||busy||stopped||b.classList.contains("up")||b.classList.contains("done"))return;
+    b.classList.add("up");b.setAttribute("aria-label",deck[b.dataset.i]);open.push(b);
+    if(open.length===2){const[a,c]=open;open=[];
+      if(deck[a.dataset.i]===deck[c.dataset.i]){a.classList.replace("up","done");c.classList.replace("up","done");pairs++;award(1);if(pairs===8)setTimeout(()=>done({correct:8,total:8,unit:"pairs"}),500)}
+      else{buzzer();busy=true;setTimeout(()=>{a.classList.remove("up");c.classList.remove("up");a.setAttribute("aria-label","Hidden card");c.setAttribute("aria-label","Hidden card");busy=false},750)}}});
+  return{W:8,state:()=>({correct:pairs,total:8,unit:"pairs"}),stop(){stopped=true}};
+}
+
+/* ---------- find the elf ---------- */
+const ELVES=["🧝","🧝‍♀️","🧝‍♂️"];
+const DECOYS=["🎅","🤶","🧑‍🎄","⛄","☃️","🦌","🐧","🎁","🎄","🍪","🔔","🧸","🕯️","🧦","🍭","🦉","🐻‍❄️","👼","🧚","❄️","⭐","🛷","🎀","🍬","🧣","🌟","🐿️","🦊","🐇","🏠","🧙","🧑‍🦰","👶","🤴","👸"];
+function findElfGame(area,d,award,done){
+  const night=d.pool==="night",R=5,counts=night?[70,95,120,145,170]:[35,50,65,80,100],elfSize=night?[3.6,3.3,3,2.8,2.6]:[5,4.6,4.2,3.8,3.4],weights=[1,1,2,2,3];
+  let r=0,found=0,stopped=false,tm,stopClock=()=>{};
+  function scene(){
+    if(stopped)return;if(r>=R){done({correct:found,total:R,unit:"elves found"});return}
+    const items=[];for(let i=0;i<counts[r];i++){const sz=night?2.6+Math.random()*3.4:3+Math.random()*4.6;
+      items.push(`<span class="it" style="left:${3+Math.random()*94}%;top:${5+Math.random()*90}%;font-size:${sz}cqw;--r:${rnd(50)-25}deg;z-index:${rnd(50)}">${DECOYS[rnd(DECOYS.length)]}</span>`)}
+    const ex=6+Math.random()*88,ey=10+Math.random()*82;
+    items.push(`<span class="it elf" style="left:${ex}%;top:${ey}%;font-size:${elfSize[r]}cqw;--r:${rnd(40)-20}deg;z-index:${10+rnd(30)}" role="button" aria-label="Elf">${ELVES[rnd(3)]}</span>`);
+    let settled=false;
+    area.innerHTML=`${qBarHTML}<div class="qmeta"><span>Scene ${r+1} of ${R}</span><span>Find this elf: <b style="font-size:1.4rem">🧝</b></span></div>
+      <div class="scene ${night?"night":""}" id="scene">${shuffle(items).join("")}</div>
+      <div class="row" style="margin-top:10px"><button class="btn ghost" id="skipScene">Skip this scene</button><div class="fb" id="fb" aria-live="polite" style="margin:0"></div></div>`;
+    const sc=$("#scene");
+    sc.addEventListener("click",e=>{if(stopped||settled)return;const rect=sc.getBoundingClientRect(),x=(e.clientX-rect.left)/rect.width*100,y=(e.clientY-rect.top)/rect.height*100;
+      const elf=e.target.closest(".elf");
+      if(elf&&!elf.classList.contains("found")){settled=true;stopClock();$("#skipScene").disabled=true;elf.classList.add("found");found++;const ring=document.createElement("span");ring.className="ring";ring.style.left=elf.style.left;ring.style.top=elf.style.top;sc.appendChild(ring);
+        const p=award(weights[r]);$("#fb").className="fb good";$("#fb").textContent=`You found the elf! +${p} ${REWARD}`;r++;tm=setTimeout(scene,1300)}
+      else if(!elf){const m=document.createElement("span");m.className="miss";m.textContent="✗";m.style.left=x+"%";m.style.top=y+"%";sc.appendChild(m);setTimeout(()=>m.remove(),1000);
+        buzzer();$("#fb").className="fb badf";$("#fb").textContent="That's not the elf. Keep looking!"}});
+    const giveUp=timedOut=>{if(settled)return;settled=true;stopClock();const elf=sc.querySelector(".elf");elf.style.filter="drop-shadow(0 0 6px red) drop-shadow(0 0 12px red)";elf.style.zIndex=999;
+      if(timedOut)buzzer();$("#fb").className="fb badf";$("#fb").textContent=timedOut?"Time's up! The elf was here.":"The elf was here!";$("#skipScene").disabled=true;r++;tm=setTimeout(scene,1600)};
+    $("#skipScene").onclick=()=>giveUp(false);
+    stopClock=qClock(()=>giveUp(true));
+  }
+  scene();
+  return{ownTimer:true,W:weights.reduce((a,b)=>a+b,0),state:()=>({correct:found,total:R,unit:"elves found"}),stop(){stopped=true;clearTimeout(tm);stopClock()}};
+}
+
+/* ---------- picture puzzles ---------- */
+async function paintScene(){
+  try{await document.fonts.load('700 64px "Mountains of Christmas"')}catch(e){}
+  const S0=600,c=document.createElement("canvas");c.width=c.height=S0;const x=c.getContext("2d");
+  const night=Math.random()<.5,EF='"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+  const g=x.createLinearGradient(0,0,0,S0);
+  if(night){g.addColorStop(0,"#0b1d3a");g.addColorStop(.6,"#2c4a7c")}else{g.addColorStop(0,"#f7b267");g.addColorStop(.6,"#c9e4f5")}
+  x.fillStyle=g;x.fillRect(0,0,S0,S0);
+  x.fillStyle="rgba(255,255,255,.9)";for(let i=0;i<(night?70:20);i++){x.beginPath();x.arc(Math.random()*S0,Math.random()*360,Math.random()*2+.5,0,7);x.fill()}
+  x.fillStyle="#ffffff";x.beginPath();x.moveTo(0,420);for(let i=0;i<=6;i++)x.quadraticCurveTo(i*100+50,390+Math.random()*40,(i+1)*100,415+Math.random()*20);x.lineTo(S0,S0);x.lineTo(0,S0);x.fill();
+  x.fillStyle="#e3eef5";x.beginPath();x.ellipse(150,560,260,60,0,0,7);x.fill();
+  const em=(ch,px,cx,cy)=>{x.font=`${px}px ${EF}`;x.textAlign="center";x.textBaseline="middle";x.fillText(ch,cx,cy)};
+  const flip=Math.random()<.5,L=v=>flip?S0-v:v;
+  em(night?"🌕":"☀️",80,L(500),90);
+  em("🛷",50,L(130),190);em("🦌",44,L(185),182);em("🦌",44,L(230),174);
+  em("🎄",230,L(140),370);em("🏠",170,L(440),360);em("⛄",130,L(300),450);
+  em("🎁",60,L(70),520);em("🎁",50,L(120),540);em("🎁",56,L(500),520);em("🦌",70,L(560),470);em("🐧",50,L(380),540);
+  for(let i=0;i<14;i++)em("❄️",14+rnd(16),Math.random()*S0,Math.random()*300);
+  x.font='700 66px "Mountains of Christmas", Georgia, serif';x.textAlign="center";x.textBaseline="middle";x.lineWidth=8;x.strokeStyle="#7a1220";x.strokeText("Merry Christmas",S0/2,60);x.fillStyle="#e9b949";x.fillText("Merry Christmas",S0/2,60);
+  return c.toDataURL("image/jpeg",.85);
+}
+function tileStyle(img,N,idx){const r=Math.floor(idx/N),c=idx%N;return`background-image:url(${img});background-size:${N*100}% ${N*100}%;background-position:${N>1?c/(N-1)*100:0}% ${N>1?r/(N-1)*100:0}%`}
+function jigsawGame(area,d,award,done){
+  const N=4,T=N*N;let perm,sel=null,stopped=false,img=null,best=0;
+  area.innerHTML=`<p class="muted" style="margin:0 0 10px">Tap a piece, then tap another to swap them. Finish the picture!</p><div class="pz"><div class="board" id="board" style="grid-template-columns:repeat(${N},1fr)"></div><div class="ref" id="ref">Painting the picture…</div></div><div class="fb" id="fb" aria-live="polite"></div>`;
+  const inPlace=()=>perm?perm.filter((p,i)=>p===i).length:0;
+  function draw(){$("#board").innerHTML=perm.map((p,i)=>`<button class="pt${sel===i?" sel":""}" data-i="${i}" style="${tileStyle(img,N,p)}" aria-label="Piece ${i+1}"></button>`).join("")}
+  paintScene().then(u=>{if(stopped)return;img=u;do{perm=shuffle([...Array(T).keys()])}while(perm.some((p,i)=>p===i));
+    $("#ref").innerHTML=`<img src="${img}" alt="The finished picture">The finished picture`;draw()});
+  $("#board").addEventListener("click",e=>{const b=e.target.closest(".pt");if(!b||stopped||!perm)return;const i=+b.dataset.i;
+    if(sel===null){sel=i;draw();return}if(sel===i){sel=null;draw();return}
+    [perm[sel],perm[i]]=[perm[i],perm[sel]];sel=null;draw();const n=inPlace();$("#fb").className="fb";$("#fb").textContent=`${n} of ${T} pieces in place`;
+    if(n>best){award(n-best,true);best=n}
+    if(n===T){$("#fb").className="fb good";$("#fb").textContent="Picture complete!";setTimeout(()=>done({correct:T,total:T,unit:"pieces in place"}),700)}});
+  return{W:T,state:()=>({correct:inPlace(),total:T,unit:"pieces in place",frac:inPlace()/T}),stop(){stopped=true}};
+}
+function slideGame(area,d,award,done){
+  const N=3,T=N*N,B=T-1;let st=[...Array(T).keys()],stopped=false,img=null,best=0;
+  const nbrs=i=>{const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o};
+  const inPlace=()=>st.filter((p,i)=>p===i&&p!==B).length;
+  do{st=[...Array(T).keys()];let prev=-1;for(let m=0;m<160;m++){const b=st.indexOf(B),opts=nbrs(b).filter(x=>x!==prev),j=opts[rnd(opts.length)];[st[b],st[j]]=[st[j],st[b]];prev=b}}while(inPlace()>2);
+  area.innerHTML=`<p class="muted" style="margin:0 0 10px">Tap a tile next to the empty space to slide it. Rebuild the picture!</p><div class="pz"><div class="board" id="board" style="grid-template-columns:repeat(${N},1fr)"></div><div class="ref" id="ref">Painting the picture…</div></div><div class="fb" id="fb" aria-live="polite"></div>`;
+  function draw(){$("#board").innerHTML=st.map((p,i)=>p===B?`<button class="pt blank" data-i="${i}" aria-label="Empty space"></button>`:`<button class="pt" data-i="${i}" style="${tileStyle(img,N,p)}" aria-label="Tile ${p+1}"></button>`).join("")}
+  paintScene().then(u=>{if(stopped)return;img=u;$("#ref").innerHTML=`<img src="${img}" alt="The finished picture">The finished picture`;draw()});
+  $("#board").addEventListener("click",e=>{const b=e.target.closest(".pt");if(!b||stopped||!img)return;const i=+b.dataset.i,bl=st.indexOf(B);if(!nbrs(bl).includes(i))return;
+    [st[bl],st[i]]=[st[i],st[bl]];draw();const n=inPlace();$("#fb").className="fb";$("#fb").textContent=`${n} of ${B} tiles in place`;
+    if(n>best){award(n-best,true);best=n}
+    if(st.every((p,j)=>p===j)){$("#fb").className="fb good";$("#fb").textContent="Puzzle solved!";setTimeout(()=>done({correct:B,total:B,unit:"tiles in place"}),700)}});
+  return{W:B,state:()=>({correct:inPlace(),total:B,unit:"tiles in place",frac:inPlace()/B}),stop(){stopped=true}};
+}
+/* ---------- festive word guess (5 letters, 6 tries, 2 words) ---------- */
+const WG_WORDS=[["SANTA","He comes down the chimney"],["CAROL","A Christmas song"],["ANGEL","Sits on top of some trees"],["BELLS","They jingle"],["MERRY","___ Christmas!"],
+ ["JOLLY","How Santa is often described"],["CANDY","___ cane"],["GIFTS","Found under the tree"],["CHEER","Christmas ___"],["FEAST","A big Christmas meal"],["PELAU","One-pot rice and pigeon peas"],
+ ["HOLLY","Prickly plant with red berries"],["FROST","Jack ___"],["TOAST","Raise a glass and give one"],["SWEET","___ bread"],["CREAM","Ponche de ___"],["ELVES","Santa's helpers"],
+ ["TREAT","Something nice to eat"],["GRAVY","Pour it over your plate"],["STARS","They shine in the night sky"],["SAUCE","Cranberry ___"],["PARTY","The office Christmas ___"],["LIGHT","What a candle gives off"]];
+function wordGuessGame(area,d,award,done,k){
+  const words=deal(WG_WORDS,2,k,d.n*1009),R=6,L=5;let wi=0,solved=0,row=0,cur="",grid=[],marks=[],keys={},stopped=false,locked=false,tm;
+  function rate(g,a){const res=Array(L).fill("no"),left={};for(let i=0;i<L;i++){if(g[i]===a[i])res[i]="ok";else left[a[i]]=(left[a[i]]||0)+1}
+    for(let i=0;i<L;i++)if(res[i]!=="ok"&&left[g[i]]){res[i]="near";left[g[i]]--}return res}
+  function draw(msg,cls){
+    const [ans,hint]=words[wi];
+    const rows=[...Array(R)].map((_,r)=>{const g=r<grid.length?grid[r]:r===row?cur:"";
+      return `<div class="wg-row">${[...Array(L)].map((_,i)=>`<span class="wg-t ${r<grid.length?marks[r][i]:(g[i]?"typed":"")}">${g[i]||""}</span>`).join("")}</div>`}).join("");
+    const kb=["QWERTYUIOP","ASDFGHJKL","⏎ZXCVBNM⌫"].map(line=>`<div class="wg-kr">${[...line].map(ch=>{const lab=ch==="⏎"?"Enter":ch==="⌫"?"⌫":ch;
+      return `<button class="wg-k ${keys[ch]||""}${ch==="⏎"||ch==="⌫"?" wide":""}" data-k="${ch}" aria-label="${ch==="⏎"?"Enter":ch==="⌫"?"Delete":ch}">${lab}</button>`}).join("")}</div>`).join("");
+    area.innerHTML=`<div class="qmeta"><span>Word ${wi+1} of ${words.length} · guess the 5-letter Christmas word</span>${chip("h")}</div>
+      <p class="muted" style="margin:0 0 8px">🟩 right letter, right spot · 🟨 in the word, wrong spot · ⬜ not in the word${grid.length>=3?`<br><b>Hint:</b> ${esc(hint)}`:""}</p>
+      <div class="wg-board">${rows}</div><div class="fb ${cls||""}" id="fb" aria-live="polite" style="text-align:center">${msg||""}</div><div class="wg-kb">${kb}</div>`;
+  }
+  function press(ch){
+    if(stopped||locked)return;
+    if(ch==="⌫"){cur=cur.slice(0,-1);draw();return}
+    if(ch==="⏎"){
+      if(cur.length<L){draw("Type all 5 letters first.","badf");return}
+      const [ans]=words[wi],m=rate(cur,ans);grid.push(cur);marks.push(m);
+      [...cur].forEach((c,i)=>{const s=m[i];if(s==="ok"||(s==="near"&&keys[c]!=="ok")||(!keys[c]))keys[c]=s});
+      const g=cur;cur="";
+      if(g===ans){locked=true;solved++;const p=award(R-row);draw(`🎉 ${ans}! +${p} ${REWARD}`,"good");tm=setTimeout(next,1500);return}
+      row++;
+      if(row>=R){locked=true;buzzer();draw(`Out of guesses. The word was ${ans}.`,"badf");tm=setTimeout(next,1900);return}
+      draw();return}
+    if(/^[A-Z]$/.test(ch)&&cur.length<L){cur+=ch;draw()}
+  }
+  function next(){wi++;if(wi>=words.length){done({correct:solved,total:words.length,unit:"words guessed"});return}
+    row=0;cur="";grid=[];marks=[];keys={};locked=false;draw()}
+  const onKey=e=>{if(stopped||e.ctrlKey||e.metaKey||e.altKey||!document.getElementById("garea"))return;
+    if(e.key==="Enter"){e.preventDefault();press("⏎")}else if(e.key==="Backspace"){e.preventDefault();press("⌫")}else if(/^[a-z]$/i.test(e.key))press(e.key.toUpperCase())};
+  document.addEventListener("keydown",onKey);
+  area.addEventListener("click",e=>{const b=e.target.closest(".wg-k");if(b)press(b.dataset.k)});
+  draw();
+  return{W:R*words.length,state:()=>({correct:solved,total:words.length,unit:"words guessed"}),stop(){stopped=true;clearTimeout(tm);document.removeEventListener("keydown",onKey)}};
+}
+
+/* ---------- 6x6 Christmas sudoku (rows, columns and 2x3 boxes each hold 1–6 once) ---------- */
+function makeSudoku6(givens){
+  const N=6,base=(r,c)=>((r%2)*3+Math.floor(r/2)+c)%N;   // a valid starting grid
+  const bands=shuffle([0,1,2]),rows=bands.flatMap(b=>shuffle([b*2,b*2+1])),stacks=shuffle([0,1]),cols=stacks.flatMap(s=>shuffle([s*3,s*3+1,s*3+2])),digits=shuffle([1,2,3,4,5,6]);
+  const sol=[...Array(N)].map((_,r)=>[...Array(N)].map((_,c)=>digits[base(rows[r],cols[c])]));
+  const ok=(g,r,c,v)=>{for(let i=0;i<N;i++)if(g[r][i]===v||g[i][c]===v)return false;const br=r-r%2,bc=c-c%3;for(let i=0;i<2;i++)for(let j=0;j<3;j++)if(g[br+i][bc+j]===v)return false;return true};
+  const count=(g,lim)=>{for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(!g[r][c]){let n=0;for(let v=1;v<=N;v++)if(ok(g,r,c,v)){g[r][c]=v;n+=count(g,lim-n);g[r][c]=0;if(n>=lim)return n}return n}return 1};
+  const puz=sol.map(r=>r.slice());let left=N*N;
+  for(const i of shuffle([...Array(N*N).keys()])){if(left<=givens)break;const r=Math.floor(i/N),c=i%N,v=puz[r][c];puz[r][c]=0;if(count(puz.map(x=>x.slice()),2)!==1)puz[r][c]=v;else left--}
+  return{sol,puz};
+}
+function sudokuGame(area,d,award,done){
+  const N=6,{sol,puz}=makeSudoku6(13),cur=puz.map(r=>r.slice());let sel=null,stopped=false;
+  const blanks=[];for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(!puz[r][c])blanks.push([r,c]);
+  const correctCount=()=>blanks.filter(([r,c])=>cur[r][c]===sol[r][c]).length;
+  function draw(flash){
+    area.innerHTML=`<p class="muted" style="margin:0 0 10px">Fill the grid so every <b>row</b>, every <b>column</b> and every <b>box</b> has the numbers 1 to 6 once. Tap a square, then tap a number.</p>
+      <div class="sd-grid">${cur.map((row,r)=>row.map((v,c)=>{const given=!!puz[r][c],isSel=sel&&sel[0]===r&&sel[1]===c,same=sel&&v&&cur[sel[0]][sel[1]]===v;
+        const wrong=flash&&!given&&v&&v!==sol[r][c];
+        return `<button class="sd-c${given?" given":""}${isSel?" sel":""}${same&&!isSel?" same":""}${wrong?" wrong":""}${c===2?" br":""}${r%2===1&&r<5?" bb":""}" data-r="${r}" data-c="${c}" aria-label="Row ${r+1} column ${c+1}${v?", "+v:", empty"}">${v||""}</button>`}).join("")).join("")}</div>
+      <div class="sd-pad">${[1,2,3,4,5,6].map(n=>`<button class="sd-n" data-n="${n}">${n}</button>`).join("")}<button class="sd-n erase" data-n="0" aria-label="Erase">⌫</button></div>
+      <div class="row" style="justify-content:center"><button class="btn alt" id="sdCheck">Check my answers</button><button class="btn" id="sdDone">I'm finished</button></div>
+      <div class="fb" id="fb" aria-live="polite" style="text-align:center"></div>`;
+  }
+  function put(n){if(stopped||!sel)return;const[r,c]=sel;if(puz[r][c])return;cur[r][c]=n||0;draw();
+    if(blanks.every(([r,c])=>cur[r][c])&&correctCount()===blanks.length){stopped=true;$("#fb").className="fb good";$("#fb").textContent="🎉 Solved!";setTimeout(()=>done({correct:blanks.length,total:blanks.length,unit:"squares correct",frac:1}),900)}}
+  area.addEventListener("click",e=>{const cell=e.target.closest(".sd-c"),num=e.target.closest(".sd-n");
+    if(cell&&!stopped){sel=[+cell.dataset.r,+cell.dataset.c];draw()}
+    else if(num)put(+num.dataset.n);
+    else if(e.target.id==="sdCheck"){draw(true);const wrong=blanks.filter(([r,c])=>cur[r][c]&&cur[r][c]!==sol[r][c]).length,empty=blanks.filter(([r,c])=>!cur[r][c]).length;
+      if(wrong)buzzer();$("#fb").className="fb "+(wrong?"badf":"good");$("#fb").textContent=wrong?`${wrong} square${wrong>1?"s are":" is"} wrong (shown in red).`:empty?`So far so good! ${empty} left to fill.`:"All correct!";
+      setTimeout(()=>{if(!stopped)draw()},1600)}
+    else if(e.target.id==="sdDone")done({correct:correctCount(),total:blanks.length,unit:"squares correct",frac:correctCount()/blanks.length})});
+  const onKey=e=>{if(stopped||!document.getElementById("garea"))return;if(/^[1-6]$/.test(e.key))put(+e.key);else if(e.key==="Backspace"||e.key==="Delete")put(0)};
+  document.addEventListener("keydown",onKey);
+  draw();
+  return{W:blanks.length,state:()=>({correct:correctCount(),total:blanks.length,unit:"squares correct",frac:correctCount()/blanks.length}),stop(){stopped=true;document.removeEventListener("keydown",onKey)}};
+}
+const GAMES={quiz:quizGame,unscramble:quizGame,carol:quizGame,finale:quizGame,crossword:crosswordGame,wordsearch:wordsearchGame,memory:memoryGame,findelf:findElfGame,jigsaw:jigsawGame,slide:slideGame,wordguess:wordGuessGame,sudoku:sudokuGame};
+
+/* ================= ORGANISER ================= */
+function allPlays(){return S.all}
+const rankSort=(a,b)=>(b.score||0)-(a.score||0)||(a.timeTaken||9e9)-(b.timeTaken||9e9)||(a.finishedAt||9e15)-(b.finishedAt||9e15);
+function overall(){const m=new Map();for(const p of allPlays()){const o=m.get(p.uid)||{uid:p.uid,name:p.name,dept:p.dept,doors:0,score:0,time:0,last:0};
+  o.doors++;o.score+=p.score||0;o.time+=p.timeTaken||0;if((p.startedAt||0)>=o.last){o.last=p.startedAt||0;o.name=p.name;o.dept=p.dept}m.set(p.uid,o)}
+  return[...m.values()].sort((a,b)=>b.score-a.score||a.time-b.time)}
+async function loadResults(){
+  if(!BACKEND||!S.adminCode)return;
+  try{const rows=await rpc("admin_results",{p_code:S.adminCode});
+    S.all=(rows||[]).map(r=>({uid:r.player_key,name:r.name,dept:r.dept,door:r.door,game:r.game,status:r.status,score:r.score,correct:r.correct,total:r.total,
+      timeTaken:r.time_taken,tz:r.tz,startedAt:r.started_at?Date.parse(r.started_at):0,finishedAt:r.finished_at?Date.parse(r.finished_at):0}));
+    S.loadErr="";S.loadedAt=Date.now()}
+  catch(e){S.loadErr="Couldn't load the results: "+e.message}
+  renderAdmin();
+}
+function renderAdmin(){
+  if(!S.adminUnlocked)return;
+  const plays=allPlays(),ov=overall(),sel=S.adminDoor;
+  const rows=(sel==="all"?plays.slice():plays.filter(p=>p.door===+sel)).sort((a,b)=>sel==="all"?(a.door-b.door)||rankSort(a,b):rankSort(a,b));
+  const status=S.loadErr?`<span style="color:var(--bad)">${esc(S.loadErr)}</span>`:S.loadedAt?`Updated ${new Date(S.loadedAt).toLocaleTimeString("en-GB")} · refreshes every 30 seconds`:"Loading results…";
+  $("#viewAdmin").innerHTML=`<div class="admin">
+   <section class="panel"><h3>Test everything</h3>
+    <p class="muted" style="margin-top:0">Test mode opens every door in the calendar so you can play them all now, including locked and closed ones. Nothing you play in test mode is recorded, and only you can see it.</p>
+    <div class="row" style="margin-top:0"><button class="btn ${S.testMode?"ghost":"alt"}" id="testToggle">${S.testMode?"Turn test mode off":"Turn on test mode"}</button></div>
+    <div class="row"><select id="pvDoor" aria-label="Door to test">${DOORS.map(d=>`<option value="${d.n}">Door ${d.n} · ${esc(d.title)}</option>`).join("")}</select><button class="btn ghost" id="pvGo">Play this door now</button></div></section>
+   <section class="panel"><h3>Organiser dashboard</h3>
+    <p class="muted" style="margin-top:0">${status} <button class="linkbtn" id="refresh" style="color:var(--pine)">Refresh now</button></p>
+    <div class="stats"><div class="stat"><b>${ov.length}</b>Players</div><div class="stat"><b>${plays.length}</b>Games played</div>
+     <div class="stat"><b>${plays.reduce((a,p)=>a+(p.score||0),0).toLocaleString("en-GB")}</b>${REWARD} awarded</div></div>
+    <div class="row"><button class="btn gold" id="xls">⬇ Download results (Excel)</button><span class="muted" id="xlsMsg">Overall leaderboard, daily winners and every entry. Times are in Trinidad &amp; Tobago time.</span></div></section>
+   <section class="panel"><h3>Overall leaderboard</h3><div class="tbl-wrap"><table><thead><tr><th>#</th><th>Full name</th><th>Department</th><th>Doors</th><th>${REWARD}</th><th>Total time</th></tr></thead>
+    <tbody>${ov.slice(0,25).map((o,i)=>`<tr><td>${i+1}</td><td>${esc(o.name)}</td><td>${esc(o.dept)}</td><td>${o.doors}</td><td><b>${o.score}</b></td><td>${o.time}s</td></tr>`).join("")||`<tr><td colspan="6" class="muted">No one has played yet.</td></tr>`}</tbody></table></div></section>
+   <section class="panel"><h3>Entries</h3>
+    <div class="row" style="margin-top:0"><label for="adDoor" class="muted">Show</label><select id="adDoor"><option value="all">All doors</option>${DOORS.map(d=>`<option value="${d.n}" ${String(d.n)===sel?"selected":""}>Door ${d.n} · ${esc(d.title)}</option>`).join("")}</select></div>
+    <p class="muted">Use <b>Reset</b> to let someone play a door again, for example if their connection dropped.</p>
+    <div class="tbl-wrap"><table><thead><tr>${sel==="all"?"<th>Door</th>":"<th>Rank</th>"}<th>Full name</th><th>Department</th><th>${REWARD}</th><th>Result</th><th>Time</th><th>Status</th><th>Finished (TT)</th><th>Player time zone</th><th></th></tr></thead>
+    <tbody>${rows.map((p,i)=>`<tr><td>${sel==="all"?p.door:i+1}</td><td>${esc(p.name)}</td><td>${esc(p.dept)}</td><td><b>${p.score||0}</b></td><td>${p.correct||0}/${p.total||0}</td><td>${p.timeTaken!=null?p.timeTaken+"s":""}</td><td>${p.status==="finished"?"Finished":"Left early"}</td><td>${esc(homeTime(p.finishedAt))}</td><td>${esc(p.tz||"")}</td>
+      <td><button class="btn ghost reset" style="padding:4px 10px;font-size:.8rem" data-key="${esc(p.uid)}" data-door="${p.door}">Reset</button></td></tr>`).join("")||`<tr><td colspan="10" class="muted">No entries yet.</td></tr>`}</tbody></table></div></section>
+  </div>`;
+  $("#testToggle").onclick=()=>setTestMode(!S.testMode);
+  $("#adDoor").onchange=e=>{S.adminDoor=e.target.value;renderAdmin()};
+  $("#pvGo").onclick=()=>openDoor(DOORS[+$("#pvDoor").value-1],true);
+  $("#xls").onclick=exportXlsx;
+  $("#refresh").onclick=loadResults;
+  $("#viewAdmin").querySelectorAll(".reset").forEach(b=>b.onclick=async()=>{
+    if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Confirm reset";b.style.borderColor="var(--bad)";return}
+    b.disabled=true;b.textContent="Resetting…";
+    try{await rpc("admin_reset_play",{p_code:S.adminCode,p_player_key:b.dataset.key,p_door:+b.dataset.door});toast("Entry reset. They can play that door again.")}catch(e){toast("Couldn't reset: "+e.message)}
+    loadResults()});
+}
+function exportXlsx(){
+  const msg=$("#xlsMsg");
+  if(!window.XLSX){msg.textContent="The Excel tool didn't load. Reload the page and try again.";return}
+  const plays=allPlays().slice(),ov=overall(),wb=XLSX.utils.book_new();
+  const sheet=(rows,widths,name)=>{const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=widths.map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,name)};
+  sheet([["Rank","Full Name","Department","Doors Played",REWARD,"Total Time (s)"],...ov.map((o,i)=>[i+1,o.name,o.dept,o.doors,o.score,o.time])],[6,28,24,12,14,14],"Overall Leaderboard");
+  const daily=[["Door","Date","Game","Place","Full Name","Department",REWARD,"Result","Out Of","Time (s)"]];
+  DOORS.forEach(d=>plays.filter(p=>p.door===d.n&&p.status==="finished").sort(rankSort).slice(0,3).forEach((p,i)=>daily.push([d.n,d.date,d.title,i+1,p.name,p.dept,p.score,p.correct,p.total,p.timeTaken])));
+  sheet(daily,[6,12,30,7,28,24,14,9,8,9],"Daily Winners");
+  sheet([["Door","Date","Game","Full Name","Department",REWARD,"Result","Out Of","Time Taken (s)","Status","Started (TT time)","Finished (TT time)","Player Time Zone"],
+    ...plays.sort((a,b)=>a.door-b.door||rankSort(a,b)).map(p=>[p.door,(DOORS[p.door-1]||{}).date,p.game,p.name,p.dept,p.score||0,p.correct||0,p.total||0,p.timeTaken??"",p.status==="finished"?"Finished":"Left early",homeTime(p.startedAt),homeTime(p.finishedAt),p.tz||""])],
+    [6,12,30,28,24,14,9,8,14,12,22,22,22],"All Entries");
+  const fname=`christmas-blitz-results-${new Date().toISOString().slice(0,10)}.xlsx`;
+  try{XLSX.writeFile(wb,fname);msg.textContent="Downloaded "+fname}catch(e){msg.textContent="The download didn't start. Please try again."}
+}
+/* organiser login: the code is checked by the database, so it never appears in this page */
+let refreshTimer=null;
+function setTestMode(on){S.testMode=on;$("#testbar").hidden=!on;renderCal();renderAdmin();if(on){window.scrollTo({top:0,behavior:"smooth"});toast("Test mode on: tap any door to play it")}}
+function unlockOrg(code){S.adminUnlocked=true;S.adminCode=code;try{sessionStorage.setItem("blitz.orgcode",code)}catch(e){}
+  $("#orgForm").hidden=true;$("#orgOpen").hidden=true;$("#orgLock").hidden=false;$("#viewAdmin").hidden=false;renderAdmin();loadResults();
+  clearInterval(refreshTimer);refreshTimer=setInterval(loadResults,30000)}
+$("#orgOpen").onclick=()=>{const f=$("#orgForm");f.hidden=!f.hidden;$("#orgOpen").setAttribute("aria-expanded",String(!f.hidden));if(!f.hidden)$("#orgCode").focus()};
+$("#orgForm").onsubmit=async e=>{e.preventDefault();const code=$("#orgCode").value.trim(),err=$("#orgErr");
+  if(!BACKEND){err.textContent="The scoreboard isn't connected yet. Add your Supabase details to config.js first.";return}
+  err.textContent="Checking…";
+  try{await rpc("admin_results",{p_code:code})}catch(x){err.textContent=x.status===401||/organiser code/i.test(x.message)?"That code isn't right. Please try again.":"Couldn't reach the scoreboard: "+x.message;return}
+  err.textContent="";$("#orgCode").value="";unlockOrg(code);$("#viewAdmin").scrollIntoView({behavior:"smooth"})};
+$("#orgLock").onclick=()=>{S.adminUnlocked=false;S.adminCode=null;clearInterval(refreshTimer);try{sessionStorage.removeItem("blitz.orgcode")}catch(e){}
+  if(S.testMode)setTestMode(false);$("#viewAdmin").hidden=true;$("#viewAdmin").innerHTML="";$("#orgLock").hidden=true;$("#orgOpen").hidden=false};
+$("#testOff").onclick=()=>setTestMode(false);
+
+/* ================= DECOR ================= */
+$("#garland").innerHTML=Array.from({length:22},()=>'<span class="bulb"></span>').join("");
+// Two canvases: #snow sits behind the page, #fx sits on top (cursor sparkles + confetti).
+// Everything moves by elapsed time, not per frame, so it looks the same on 60 Hz and 120 Hz screens.
+const cv=$("#snow"),cx=cv.getContext("2d"),fv=$("#fx"),fx=fv.getContext("2d");
+let W=innerWidth,H=innerHeight,flakes=[],bursts=[],sparks=[];
+function size(){W=innerWidth;H=innerHeight;const dpr=Math.min(window.devicePixelRatio||1,2);
+  for(const c of[cv,fv]){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);c.style.width=W+"px";c.style.height=H+"px"}
+  cx.setTransform(dpr,0,0,dpr,0,0);fx.setTransform(dpr,0,0,dpr,0,0)}
+size();
+let rT;addEventListener("resize",()=>{clearTimeout(rT);rT=setTimeout(()=>{size();flakes.forEach(f=>{if(f.x>W)f.x=Math.random()*W})},120)});
+// soft round flake sprite, drawn once
+const sprite=document.createElement("canvas");sprite.width=sprite.height=32;
+{const g=sprite.getContext("2d"),rg=g.createRadialGradient(16,16,0,16,16,16);rg.addColorStop(0,"rgba(255,255,255,1)");rg.addColorStop(.45,"rgba(255,255,255,.85)");rg.addColorStop(1,"rgba(255,255,255,0)");g.fillStyle=rg;g.fillRect(0,0,32,32)}
+function makeFlake(fromTop){const z=Math.random();return{x:Math.random()*W,y:fromTop?-12:Math.random()*H,z,r:1+z*3,vy:16+z*44,amp:8+z*22,freq:.25+Math.random()*.5,ph:Math.random()*6.28,a:.3+z*.6}}
+flakes=reduce?[]:Array.from({length:Math.round(Math.min(120,Math.max(40,W*H/11000)))},()=>makeFlake(false));
+let wind=0,windTarget=0,windT=0;
+function burst(){if(reduce)return;const cols=["#e9b949","#b8202f","#3fb27f","#fbf7ee","#f6dc93"];
+  for(let i=0;i<130;i++){const a=Math.random()*Math.PI*2,sp=150+Math.random()*420;
+    bursts.push({x:W/2,y:H/3,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-260,c:cols[rnd(cols.length)],life:0,max:1.4+Math.random()*.8,rot:Math.random()*6,vr:(Math.random()-.5)*12,w:5+Math.random()*4,h:3+Math.random()*3})}}
+function star(c,x,y,r,rot){c.save();c.translate(x,y);c.rotate(rot);c.beginPath();
+  for(let i=0;i<8;i++){const rr=i%2?r*.32:r,a=i*Math.PI/4;c.lineTo(Math.cos(a)*rr,Math.sin(a)*rr)}c.closePath();c.fill();c.restore()}
+const SPARK_COLS=["#fff6d0","#e9b949","#ffffff","#f6dc93","#ffd1d6"];
+function addSpark(x,y,big){if(sparks.length>240)sparks.splice(0,sparks.length-240);
+  const sp=big?60+Math.random()*140:10+Math.random()*30,a=Math.random()*Math.PI*2;
+  sparks.push({x:x+(Math.random()-.5)*6,y:y+(Math.random()-.5)*6,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp+(big?0:25),life:0,max:.5+Math.random()*.5,s:big?3+Math.random()*4:2+Math.random()*3.5,c:SPARK_COLS[rnd(SPARK_COLS.length)],rot:Math.random()*3,vr:(Math.random()-.5)*6})}
+let lx=-99,ly=-99;
+addEventListener("pointermove",e=>{if(reduce||e.pointerType==="touch")return;const d=Math.hypot(e.clientX-lx,e.clientY-ly);if(d<5)return;
+  lx=e.clientX;ly=e.clientY;const n=Math.min(4,1+Math.floor(d/18));for(let i=0;i<n;i++)addSpark(e.clientX,e.clientY,false)},{passive:true});
+addEventListener("pointerdown",e=>{if(reduce)return;for(let i=0;i<12;i++)addSpark(e.clientX,e.clientY,true)},{passive:true});
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(.05,Math.max(0,(now-last)/1000));last=now;
+  // gentle gusts of wind
+  windT-=dt;if(windT<=0){windTarget=(Math.random()-.5)*30;windT=3+Math.random()*4}wind+=(windTarget-wind)*Math.min(1,dt*.6);
+  cx.clearRect(0,0,W,H);
+  for(const f of flakes){f.y+=f.vy*dt;f.ph+=f.freq*dt*2;f.x+=wind*(.3+f.z)*dt;
+    if(f.y>H+12)Object.assign(f,makeFlake(true));if(f.x<-30)f.x+=W+60;else if(f.x>W+30)f.x-=W+60;
+    const x=f.x+Math.sin(f.ph)*f.amp,s=f.r*2.2;cx.globalAlpha=f.a;cx.drawImage(sprite,x-s,f.y-s,s*2,s*2)}
+  cx.globalAlpha=1;
+  fx.clearRect(0,0,W,H);
+  if(bursts.length){bursts=bursts.filter(b=>(b.life+=dt)<b.max);
+    for(const b of bursts){b.vy+=620*dt;b.vx*=1-1.2*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;b.rot+=b.vr*dt;
+      fx.globalAlpha=Math.min(1,(b.max-b.life)*2);fx.save();fx.translate(b.x,b.y);fx.rotate(b.rot);fx.fillStyle=b.c;fx.fillRect(-b.w/2,-b.h/2,b.w,b.h);fx.restore()}}
+  if(sparks.length){sparks=sparks.filter(p=>(p.life+=dt)<p.max);fx.shadowColor="rgba(255,225,140,.9)";fx.shadowBlur=8;
+    for(const p of sparks){const k=p.life/p.max;p.vx*=1-2*dt;p.vy=p.vy*(1-2*dt)+40*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;
+      fx.globalAlpha=1-k;fx.fillStyle=p.c;star(fx,p.x,p.y,p.s*(1-k*.5),p.rot)}
+    fx.shadowBlur=0}
+  fx.globalAlpha=1;
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+try{const c=sessionStorage.getItem("blitz.orgcode");if(c&&BACKEND)unlockOrg(c)}catch(e){}
+renderCal();
+initBackend();
+</script>
+</body>
+</html>
