@@ -96,6 +96,16 @@ h1{font-family:var(--display);font-size:clamp(2.8rem,9vw,5.2rem);line-height:1;m
 @keyframes spark{from{transform:translate(-50%,-50%) scale(.4);opacity:1}to{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.2) rotate(180deg);opacity:0}}
 .gift{filter:drop-shadow(0 0 0 rgba(233,185,73,0));animation:shake .9s ease-in-out 2,giftglow 1.2s ease-in-out infinite alternate}
 @keyframes giftglow{to{filter:drop-shadow(0 0 22px rgba(233,185,73,.9))}}
+/* calmer papers */
+.p0{background:repeating-linear-gradient(45deg,#b8202f 0 16px,#a71c2a 16px 30px,rgba(246,220,147,.32) 30px 32px)}
+.p1{background:radial-gradient(circle at 25% 25%,rgba(233,185,73,.30) 2px,transparent 2.5px) 0 0/22px 22px,radial-gradient(circle at 75% 75%,rgba(233,185,73,.22) 1.6px,transparent 2px) 0 0/22px 22px,var(--pine)}
+.p2{background:repeating-linear-gradient(90deg,transparent 0 18px,rgba(184,32,47,.09) 18px 22px),repeating-linear-gradient(0deg,transparent 0 18px,rgba(29,90,67,.09) 18px 22px),#e8b955;color:var(--ink)}
+.p3{background:linear-gradient(rgba(184,32,47,.07) 50%,transparent 50%) 0 0/26px 26px,linear-gradient(90deg,rgba(29,90,67,.07) 50%,transparent 50%) 0 0/26px 26px,#fbf7ee;color:var(--ink)}
+.door.p0,.door.p1{text-shadow:0 1px 3px rgba(0,0,0,.45)}
+.door.p2 .num,.door.p3 .num{color:var(--berry-deep);text-shadow:none}
+.door.p2 .date,.door.p3 .date,.door.p2 .gtitle,.door.p3 .gtitle{color:var(--ink);text-shadow:none;opacity:1}
+.door .date{opacity:1;letter-spacing:.1em}
+.door .gtitle{font-size:1rem}
 .door[disabled]{cursor:default}
 .door[disabled]:hover{transform:none}
 .legend{display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:center;margin-top:18px;color:var(--mist);font-size:.88rem}
