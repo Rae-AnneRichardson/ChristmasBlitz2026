@@ -15,7 +15,7 @@
 }
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-frATuqN81ybqwyFgkeuFrZgfrqkji8cPEF6PbTP+2hA=' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-zGcGuTZbaEMKM+scTvGprd0o6imYdVfgS2yHm81Kflk=' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="Christmas Blitz: a festive advent calendar of daily games.">
 <title>Christmas Blitz</title>
@@ -372,7 +372,7 @@ const LEVEL={e:{label:"Easy",max:100,cls:"d-e"},m:{label:"Medium",max:150,cls:"d
 const DIFF={e:{label:"Easy",w:1,cls:"d-e"},m:{label:"Medium",w:2,cls:"d-m"},h:{label:"Hard",w:3,cls:"d-h"},x:{label:"Expert",w:4,cls:"d-x"}};
 // Each door is open from 8am to 8pm in the PLAYER'S OWN time zone on its date.
 const DOORS=[
- {n:1, date:"2026-11-18",type:"unscramble",pool:"words",     level:"e",title:"Elf Word Scramble",          blurb:"Unscramble festive words before the elves finish wrapping.",time:120,count:8},
+ {n:1, date:"2026-11-18",closeAt:"2026-11-19 08:00",type:"unscramble",pool:"words",     level:"e",title:"Elf Word Scramble",          blurb:"Unscramble festive words before the elves finish wrapping. Extended: open until 8am on Thu 19 Nov.",time:120,count:8},
  {n:2, date:"2026-11-19",type:"quiz",      pool:"trivia",    level:"m",title:"Festive Trivia Sprint",      blurb:"Quick-fire Christmas trivia. Tap the right answer.",time:120,count:8},
  {n:3, date:"2026-11-20",type:"crossword", pool:"cwXmas",    level:"e",title:"Christmas Mini Crossword",   blurb:"A friendly crossword with everyday Christmas words. Tap a clue to jump to it.",time:240},
  {n:4, date:"2026-11-21",type:"quiz",      pool:"tf",        level:"e",title:"Fact or Fruitcake?",         blurb:"True or false? Trust your festive gut.",time:0,count:10},
@@ -513,7 +513,8 @@ const lenDiff=s=>{const L=norm(s).length;return L<=5?"e":L<=7?"m":L<=9?"h":"x"};
 const chip=d=>`<span class="chip ${DIFF[d].cls}">${DIFF[d].label}</span>`;
 // Doors are open 8am–8pm in the player's own local time on their date.
 const OPEN_HOUR=8,CLOSE_HOUR=20;
-DOORS.forEach(d=>{const[y,m,dd]=d.date.split("-").map(Number);d.open=new Date(y,m-1,dd,OPEN_HOUR).getTime();d.close=new Date(y,m-1,dd,CLOSE_HOUR).getTime()});
+DOORS.forEach(d=>{const[y,m,dd]=d.date.split("-").map(Number);d.open=new Date(y,m-1,dd,OPEN_HOUR).getTime();d.close=new Date(y,m-1,dd,CLOSE_HOUR).getTime();
+  if(d.closeAt){const[cd,ct]=d.closeAt.split(" "),[Y,M,D]=cd.split("-").map(Number),[H,Mi]=ct.split(":").map(Number);d.close=new Date(Y,M-1,D,H,Mi).getTime()}});
 {const[y,m,dd]=WINNERS.date.split("-").map(Number);WINNERS.open=new Date(y,m-1,dd,OPEN_HOUR).getTime()}
 const stateOf=(d,t=Date.now())=>t<d.open?"locked":t<d.close?"open":"closed";
 function fmtDur(ms){ms=Math.max(0,ms);const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;
@@ -539,7 +540,7 @@ const BACKEND=typeof CFG.supabaseUrl==="string"&&typeof CFG.supabaseKey==="strin
 const S={all:[],active:null,adminDoor:"all",testMode:false,adminUnlocked:false,adminCode:null,loadErr:"",loadedAt:0,local:{},pending:{},sending:{}};
 const LS_PLAYS="blitz.plays",LS_PENDING="blitz.pending.v1";
 function readJSON(k){try{const v=JSON.parse(localStorage.getItem(k)||"{}");return v&&typeof v==="object"&&!Array.isArray(v)?v:{}}catch(e){return{}}}
-function writeJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v));return localStorage.getItem(k)!==null}catch(e){return false}}
+function writeJSON(k,v){try{const text=JSON.stringify(v);localStorage.setItem(k,text);return localStorage.getItem(k)===text}catch(e){return false}}
 S.local=readJSON(LS_PLAYS);S.pending=readJSON(LS_PENDING);
 function saveLocal(){return writeJSON(LS_PLAYS,S.local)}
 function savePendingStore(){return writeJSON(LS_PENDING,S.pending)}
@@ -574,6 +575,8 @@ function markReset(door,token){const p=S.local["d"+door];if(p&&p.token===token)d
 function sendPending(token){
   const it=S.pending[token];if(!it)return Promise.resolve({state:"none"});
   if(S.sending[token])return S.sending[token];
+  // Never send unless the complete retry request was durably written and read back.
+  if(!savePendingStore())return Promise.resolve({state:"pending",msg:"This browser could not keep the retry copy, so the result was not sent. Keep this page open, allow browser storage or free some space, then press Try again"});
   const run=(async()=>{
     try{
       const b=await rpc("finish_play",it.req);
@@ -591,26 +594,28 @@ function saveResult({d,who,correct,total,est,taken,ui}){
   if(!isToken(token)){ui("pending",0,"this game has no start record");return}
   // Keep the complete request on this device BEFORE sending, so it survives a refresh or lost connection.
   S.pending[token]={door:d.n,title:d.title,req:{p_token:token,p_score:est,p_correct:correct,p_total:total,p_time:taken},createdAt:Date.now()};
-  const stored=savePendingStore();
+  savePendingStore();
   S.local["d"+d.n]=Object.assign({},prev,{status:"started",token});saveLocal();
   const go=async()=>{ui("saving");const r=await sendPending(token);
     if(r.state==="saved")ui("saved",r.score);
     else if(r.state==="reset")ui("reset");
-    else ui("pending",0,(r.msg||"not confirmed")+(stored?"":". This browser is blocking storage, so keep this page open and press Try again"),go)};
+    else ui("pending",0,r.msg||"not confirmed",go)};
   renderCal();go();
 }
 // On every visit: resend anything unconfirmed, then ask the database about every game this device knows.
 async function syncWithServer(){
   if(!BACKEND)return;
   for(const t of Object.keys(S.pending))if(isToken(t))await sendPending(t);else{delete S.pending[t];savePendingStore()}
-  const tokens=Object.values(S.local).map(p=>p&&p.token).filter(isToken).slice(0,40);
+  // Reconcile only the records sent in this request, and only if unchanged since then.
+  const snapshot=Object.entries(S.local).filter(([k,p])=>p&&isToken(p.token)).slice(0,40);
+  const tokens=snapshot.map(([k,p])=>p.token);
   if(tokens.length){
     try{
       const rows=await rpc("play_status",{p_tokens:tokens});
       if(Array.isArray(rows)){
         const byTok=new Map(rows.filter(r=>r&&isToken(r.token)).map(r=>[r.token.toLowerCase(),r]));
-        for(const [k,p] of Object.entries(S.local)){
-          if(!p||!isToken(p.token)||S.pending[p.token])continue;
+        for(const [k,p] of snapshot){
+          if(S.local[k]!==p||S.pending[p.token])continue;
           const r=byTok.get(p.token.toLowerCase());
           if(!r)delete S.local[k];   // reset by the organiser: the door can be played again
           else if(r.status==="finished"&&isNum(r.score))S.local[k]=Object.assign({},p,{status:"finished",verified:true,score:Math.round(r.score)});
@@ -647,11 +652,11 @@ function renderPendingBar(){
   const items=Object.entries(S.pending).filter(([t])=>isToken(t));
   if(!items.length){bar.hidden=true;bar.innerHTML="";return}
   bar.hidden=false;
-  bar.innerHTML=`<b>${items.length===1?"1 score is":items.length+" scores are"} waiting to be saved.</b> ${items.length===1?"It's":"They're"} kept safely on this device and will be sent automatically.`+
+  bar.innerHTML=`<b>${items.length===1?"1 score is":items.length+" scores are"} waiting to be saved.</b> Keep this page open if browser storage is unavailable. Stored retry copies will be sent automatically.`+
     items.map(([t,it])=>`<div class="pending-item"><span>Door ${Number(it.door)||"?"}: ${esc(it.title||"")}${it.lastError?` · <span class="muted">${esc(it.lastError)}</span>`:""}</span>
       <button class="btn" data-retry="${esc(t)}" ${S.sending[t]?"disabled":""}>${S.sending[t]?"Saving…":"Try again"}</button></div>`).join("");
   bar.querySelectorAll("[data-retry]").forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent="Saving…";const r=await sendPending(b.dataset.retry);
-    toast(r.state==="saved"?`🎁 Saved! You earned ${Math.round(r.score)} ${REWARD}.`:r.state==="reset"?"That game was reset by the organiser. You can play it again.":"Still not saved. Please try again in a moment.")});
+    toast(r.state==="saved"?`🎁 Saved! You earned ${Math.round(r.score)} ${REWARD}.`:r.state==="reset"?"That game was reset by the organiser. You can play it again.":(r.msg||"Still not saved. Please try again in a moment."))});
 }
 
 /* ================= CALENDAR ================= */
@@ -741,7 +746,7 @@ const flag=preview=>preview?`<div class="preview-flag">Test mode · this game is
 async function openDoor(d,preview,other){
   openModal();
   if(!preview){
-    if(stateOf(d)!=="open"){mBody.innerHTML=`<h2 id="mTitle">Door ${d.n} is closed</h2><p>This door can only be played on ${dayLabel(d.open)}, between 8am and 8pm your time. Missed doors stay closed.</p>`;return}
+    if(stateOf(d)!=="open"){mBody.innerHTML=`<h2 id="mTitle">Door ${d.n} is closed</h2><p>This door could only be played from 8am on ${dayLabel(d.open)} until ${new Date(d.close).toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})} your time. Missed doors stay closed.</p>`;return}
     const p=other?null:myPlay(d.n);
     if(p){mBody.innerHTML=`<div class="kicker">Door ${d.n} · ${dayLabel(d.open)}</div><h2 id="mTitle">${esc(d.title)}</h2>
       ${playMessage(p)}`;afterPlayedMessage(d);return}
@@ -820,7 +825,7 @@ function startGame(d,who,preview,k){
         burst();if(points>0)toast(`🎁 You just earned ${points} ${REWARD}!`)}
       else if(state==="preview"){big.textContent=points;box.innerHTML=`<p class="muted">Test mode: this score is not saved.</p>`}
       else if(state==="reset"){big.textContent="–";box.innerHTML=`<p class="err">The organiser reset this game, so this result wasn't saved. You can play this door again.</p>`}
-      else{big.textContent="–";box.innerHTML=`<p class="err">⚠️ Your score isn't saved yet${msg?": "+esc(msg):"."}</p><p class="muted">It's kept on this device. We'll try again automatically next time you open the game.</p>${retry?`<button class="btn" id="retrySave">Try again now</button>`:""}`;
+      else{big.textContent="–";box.innerHTML=`<p class="err">⚠️ Your score isn't saved yet${msg?": "+esc(msg):"."}</p><p class="muted">Keep this page open if browser storage is unavailable. Stored retry copies will be retried when you reopen the game.</p>${retry?`<button class="btn" id="retrySave">Try again now</button>`:""}`;
         if(retry)$("#retrySave").onclick=retry}
     };
     if(preview){ui("preview",est);burst();return}
