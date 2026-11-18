@@ -15,7 +15,7 @@
 }
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-zGcGuTZbaEMKM+scTvGprd0o6imYdVfgS2yHm81Kflk=' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZUOu4FjOWCPWhFmZprdsaPqizO1NshSRmJ4JD614Zsg=' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="Christmas Blitz: a festive advent calendar of daily games.">
 <title>Christmas Blitz</title>
@@ -1226,7 +1226,7 @@ function renderAdmin(){
    <section class="panel"><h3>Entries</h3>
     <div class="row" style="margin-top:0"><label for="adDoor" class="muted">Show</label><select id="adDoor"><option value="all">All doors</option>${DOORS.map(d=>`<option value="${d.n}" ${String(d.n)===sel?"selected":""}>Door ${d.n} · ${esc(d.title)}</option>`).join("")}</select></div>
     <p class="muted">Use <b>Reset</b> to let someone play a door again, for example if their game was interrupted. Their device updates the next time they open the game.</p>
-    <div class="tbl-wrap"><table><thead><tr>${sel==="all"?"<th>Door</th>":"<th>Rank</th>"}<th>Game</th><th>Full name</th><th>Department</th><th>${REWARD}</th><th>Result</th><th>Time</th><th>Status</th><th>Date played (TT)</th><th>Finished (TT)</th><th>Flags</th><th></th></tr></thead>
+    <div class="tbl-wrap"><table><thead><tr>${sel==="all"?"<th>Door</th>":"<th>Rank</th>"}<th>Game</th><th>Full name</th><th>Department</th><th>${REWARD}</th><th>Result</th><th>Time</th><th>Status</th><th>Date played (TT)</th><th>Completed (TT)</th><th>Flags</th><th></th></tr></thead>
     <tbody>${rows.map((p,i)=>`<tr><td>${sel==="all"?p.door:i+1}</td><td>${esc(p.game)}</td><td>${esc(p.name)}</td><td>${esc(p.dept)}</td><td><b>${p.score}</b></td><td>${p.correct}/${p.total}</td><td>${p.timeTaken!=null?p.timeTaken+"s":""}</td><td>${p.status==="finished"?"Finished":"Not finished"}</td><td>${esc(ttDate(p.startedAt))}</td><td>${esc(homeTime(p.finishedAt))}</td><td>${esc(p.flags.map(f=>FLAG_TEXT[f]||f).join("; "))}</td>
       <td><button class="btn ghost reset" style="padding:4px 10px;font-size:.8rem" data-key="${esc(p.uid)}" data-door="${p.door}">Reset</button></td></tr>`).join("")||`<tr><td colspan="12" class="muted">No entries yet.</td></tr>`}</tbody></table></div></section>
   </div>`;
@@ -1253,13 +1253,13 @@ async function exportXlsx(){
   const doorDate=n=>{const d=DOORS.find(x=>x.n===n);return d?d.date:""};
   const sheet=(rows,widths,name)=>{const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=widths.map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,name)};
   sheet([["Rank","Full Name","Department","Games Played",REWARD,"Total Time (s)"],...ov.map((o,i)=>[i+1,o.name,o.dept,o.doors,o.score,o.time])],[6,28,24,13,14,14],"Overall Leaderboard");
-  const daily=[["Door","Game","Game Date","Place","Full Name","Department","Date Played (TT)",REWARD,"Result","Out Of","Time (s)","Flags"]];
-  DOORS.forEach(d=>plays.filter(p=>p.door===d.n&&p.status==="finished").sort(rankSort).slice(0,3).forEach((p,i)=>daily.push([d.n,d.title,d.date,i+1,p.name,p.dept,ttDate(p.startedAt),p.score,p.correct,p.total,p.timeTaken??"",p.flags.map(f=>FLAG_TEXT[f]||f).join("; ")])));
-  sheet(daily,[6,30,12,7,28,24,16,14,9,8,9,36],"Daily Winners");
-  sheet([["Door","Game","Game Date","Full Name","Department","Date Played (TT)",REWARD,"Result","Out Of","Time Taken (s)","Status","Started (TT time)","Finished (TT time)","Player Time Zone","Flags"],
-    ...plays.sort((a,b)=>a.door-b.door||rankSort(a,b)).map(p=>[p.door,p.game,doorDate(p.door),p.name,p.dept,ttDate(p.startedAt),p.score,p.correct,p.total,p.timeTaken??"",p.status==="finished"?"Finished":"Not finished",homeTime(p.startedAt),homeTime(p.finishedAt),p.tz,p.flags.map(f=>FLAG_TEXT[f]||f).join("; ")])],
-    [6,30,12,28,24,16,14,9,8,14,13,22,22,22,36],"All Entries");
-  sheet([["Door","Game","Full Name","Department","Date Played (TT)",REWARD,"Why it needs checking"],...chk.map(x=>[x.p.door,x.p.game,x.p.name,x.p.dept,ttDate(x.p.startedAt),x.p.score,x.why])],[6,30,28,24,16,14,50],"Needs Checking");
+  const daily=[["Door","Game","Game Date","Place","Full Name","Department","Date Played (TT)","Date Completed (TT)",REWARD,"Result","Out Of","Time (s)","Flags"]];
+  DOORS.forEach(d=>plays.filter(p=>p.door===d.n&&p.status==="finished").sort(rankSort).slice(0,3).forEach((p,i)=>daily.push([d.n,d.title,d.date,i+1,p.name,p.dept,ttDate(p.startedAt),ttDate(p.finishedAt),p.score,p.correct,p.total,p.timeTaken??"",p.flags.map(f=>FLAG_TEXT[f]||f).join("; ")])));
+  sheet(daily,[6,30,12,7,28,24,16,19,14,9,8,9,36],"Daily Winners");
+  sheet([["Door","Game","Game Date","Full Name","Department","Date Played (TT)","Date Completed (TT)",REWARD,"Result","Out Of","Time Taken (s)","Status","Started (TT time)","Finished (TT time)","Player Time Zone","Flags"],
+    ...plays.sort((a,b)=>a.door-b.door||rankSort(a,b)).map(p=>[p.door,p.game,doorDate(p.door),p.name,p.dept,ttDate(p.startedAt),ttDate(p.finishedAt)||"Not completed",p.score,p.correct,p.total,p.timeTaken??"",p.status==="finished"?"Finished":"Not finished",homeTime(p.startedAt),homeTime(p.finishedAt),p.tz,p.flags.map(f=>FLAG_TEXT[f]||f).join("; ")])],
+    [6,30,12,28,24,16,19,14,9,8,14,13,22,22,22,36],"All Entries");
+  sheet([["Door","Game","Full Name","Department","Date Played (TT)","Date Completed (TT)",REWARD,"Why it needs checking"],...chk.map(x=>[x.p.door,x.p.game,x.p.name,x.p.dept,ttDate(x.p.startedAt),ttDate(x.p.finishedAt)||"Not completed",x.p.score,x.why])],[6,30,28,24,16,19,14,50],"Needs Checking");
   const fname=`christmas-blitz-results-${new Date().toISOString().slice(0,10)}.xlsx`;
   try{XLSX.writeFile(wb,fname);msg.textContent="Downloaded "+fname}catch(e){msg.textContent="The download didn't start. Please try again."}
 }
