@@ -2,24 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script>
-/* =====================================================================
-   SUPABASE SETTINGS: paste your two values between the quote marks.
-   Project URL  = Supabase > Project Settings > Data API
-   Key          = Supabase > Project Settings > API Keys > Publishable (or "anon public") key
-   Never paste the "secret" or "service_role" key here.
-   ===================================================================== */
-window.BLITZ_CONFIG = {
-  supabaseUrl: "https://rlvzcqbgemncqndnsrfb.supabase.co",
-  supabaseKey: "sb_publishable_ZDqFTGHDbDY5YGQFpsOolg_kSNsWV4E"
-};
+<!-- =====================================================================
+     SUPABASE SETTINGS are in the block just below. Only change the two
+     values between the quote marks. Project URL = Supabase > Project Settings
+     > Data API. Key = Project Settings > API Keys > Publishable (or "anon
+     public") key. Never paste a "secret" or "service_role" key here.
+     ===================================================================== -->
+<script type="application/json" id="blitz-config">
+{
+  "supabaseUrl": "https://rlvzcqbgemncqndnsrfb.supabase.co",
+  "supabaseKey": "sb_publishable_ZDqFTGHDbDY5YGQFpsOolg_kSNsWV4E"
+}
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-frATuqN81ybqwyFgkeuFrZgfrqkji8cPEF6PbTP+2hA=' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="description" content="Christmas Blitz: a festive advent calendar of daily games.">
 <title>Christmas Blitz</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Nunito:wght@400;600;800&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 /* Layout: a night-sky page holding a 4x4 advent calendar of wrapped presents; each present unwraps into a game card. Deliberately single-theme (Christmas night). */
 :root{
@@ -186,6 +187,10 @@ h1{font-family:var(--display);font-size:clamp(2.8rem,9vw,5.2rem);line-height:1;m
 .sd-pad{display:flex;justify-content:center;gap:6px;margin-top:12px;flex-wrap:wrap}
 .sd-n{width:46px;height:46px;border:0;border-radius:10px;background:var(--pine);color:#fff;font-weight:800;font-size:1.2rem}
 .sd-n.erase{background:#e3e9e5;color:var(--ink)}
+.pending-bar{text-align:left;background:#fff4cf;color:var(--ink);border-color:var(--gold)}
+.pending-item{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;margin-top:8px;padding:8px 10px;border-radius:10px;background:#fff}
+.pending-item .btn{padding:6px 14px;font-size:.9rem}
+.save-box{display:grid;gap:4px;justify-items:center;max-width:520px}.save-box p{margin:0}
 .carol-hint{margin:-4px 0 12px;padding:8px 12px;border-radius:10px;background:#fff4cf;color:var(--ink);font-weight:700;font-size:.92rem;text-align:center}
 .cw-cell.ok input{background:#dff3e7;border-color:var(--ok)} .cw-cell.no input{background:#fbe1e3;border-color:var(--bad)}
 .cw-cell small{position:absolute;top:1px;left:3px;font-size:calc(var(--cell)*.27);font-weight:800;color:var(--berry);pointer-events:none;z-index:1}
@@ -313,6 +318,7 @@ select{font:inherit;padding:9px 10px;border-radius:10px;border:2px solid #cfd8d3
     <div class="countdown" id="countdown">Loading the calendar…</div>
   </header>
   <div class="note" id="note" hidden></div>
+  <div class="note pending-bar" id="pendingBar" hidden></div>
   <main id="viewCal">
     <div class="cal" id="cal"></div>
     <div class="legend"><span class="lg-open">Open today</span><span class="lg-lock">Still wrapped</span><span class="lg-done">Played</span><span class="lg-miss">Missed (closed for good)</span></div>
@@ -337,7 +343,6 @@ select{font:inherit;padding:9px 10px;border-radius:10px;border:2px solid #cfd8d3
       </div>
     </div>
   </section>
-  <script>document.querySelectorAll(".track").forEach(t=>[...t.children].forEach(i=>{const c=i.cloneNode();c.alt="";c.setAttribute("aria-hidden","true");c.classList.add("dup");t.appendChild(c)}))</script>
   <footer class="org">
     <button class="linkbtn" id="orgOpen" aria-expanded="false">🔒 Organiser login</button>
     <form id="orgForm" class="orgform" hidden novalidate>
@@ -520,30 +525,134 @@ function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 let toastT;function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),2200)}
 function scrambleWord(w){if(w.length<2||new Set(w).size<2)return w;let s;do{s=shuffle(w.split("")).join("")}while(s===w);return s}
+// Same rule as the database: nothing right = 0, else share × max, at least 50, at most max. The database has the final say.
+function pointsFor(max,correct,total){return correct<=0||total<=0?0:Math.min(max,Math.max(MIN_PTS,Math.round(max*correct/total)))}
+let RUN_SEQ=0;
 const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ================= STATE / BACKEND (Supabase) ================= */
-const CFG=window.BLITZ_CONFIG||{};
-const BACKEND=!!(CFG.supabaseUrl&&CFG.supabaseKey&&!/YOUR-/.test(CFG.supabaseUrl+CFG.supabaseKey));
-const S={all:[],active:null,adminDoor:"all",testMode:false,adminUnlocked:false,adminCode:null,loadErr:"",loadedAt:0,local:{}};
-try{S.local=JSON.parse(localStorage.getItem("blitz.plays")||"{}")||{}}catch(e){S.local={}}
-function saveLocal(){try{localStorage.setItem("blitz.plays",JSON.stringify(S.local))}catch(e){}}
-function myPlay(n){return S.local["d"+n]}
+// Refuse to run inside someone else's frame (clickjacking).
+if(window.top!==window.self){try{window.top.location.replace(window.self.location.href)}catch(e){document.documentElement.style.display="none"}}
+// Settings live in a non-executable JSON block at the top of the file.
+const CFG=(()=>{try{const el=document.getElementById("blitz-config");if(el)return JSON.parse(el.textContent)}catch(e){}return window.BLITZ_CONFIG||{}})();
+const BACKEND=typeof CFG.supabaseUrl==="string"&&typeof CFG.supabaseKey==="string"&&/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(CFG.supabaseUrl)&&!/YOUR-/.test(CFG.supabaseKey);
+const S={all:[],active:null,adminDoor:"all",testMode:false,adminUnlocked:false,adminCode:null,loadErr:"",loadedAt:0,local:{},pending:{},sending:{}};
+const LS_PLAYS="blitz.plays",LS_PENDING="blitz.pending.v1";
+function readJSON(k){try{const v=JSON.parse(localStorage.getItem(k)||"{}");return v&&typeof v==="object"&&!Array.isArray(v)?v:{}}catch(e){return{}}}
+function writeJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v));return localStorage.getItem(k)!==null}catch(e){return false}}
+S.local=readJSON(LS_PLAYS);S.pending=readJSON(LS_PENDING);
+function saveLocal(){return writeJSON(LS_PLAYS,S.local)}
+function savePendingStore(){return writeJSON(LS_PENDING,S.pending)}
+function myPlay(n){const p=S.local["d"+n];if(p&&p.token&&S.pending[p.token])return Object.assign({},p,{pending:true});return p}
 function setLocal(n,rec){S.local["d"+n]=rec;saveLocal()}
 function canPlay(){return BACKEND}
 const deviceId=(()=>{let id=lsGet("blitz.device");if(!id){id=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now()+"-"+Math.random().toString(36).slice(2);lsSet("blitz.device",id)}return id})();
-// Calls a Supabase database function through the public REST endpoint.
+const isNum=v=>typeof v==="number"&&Number.isFinite(v);
+const isToken=t=>typeof t==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t);
+
+// Calls a database function through Supabase's public REST endpoint (15-second time limit).
 async function rpc(fn,args){
   const headers={"Content-Type":"application/json",apikey:CFG.supabaseKey};
   if(/^eyJ/.test(CFG.supabaseKey))headers.Authorization="Bearer "+CFG.supabaseKey;
-  const r=await fetch(CFG.supabaseUrl.replace(/\/+$/,"")+"/rest/v1/rpc/"+fn,{method:"POST",headers,body:JSON.stringify(args)});
-  const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch(e){}
-  if(!r.ok){const e=new Error((j&&(j.message||j.hint))||("Error "+r.status));e.status=r.status;throw e}
-  return j;
+  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),15000);
+  try{
+    const r=await fetch(CFG.supabaseUrl.replace(/\/+$/,"")+"/rest/v1/rpc/"+fn,{method:"POST",headers,body:JSON.stringify(args),signal:ctl.signal,cache:"no-store",credentials:"omit"});
+    const txt=await r.text();let j=null;try{j=txt?JSON.parse(txt):null}catch(e){}
+    if(!r.ok){const e=new Error((j&&(j.message||j.hint))||("Error "+r.status));e.status=r.status;throw e}
+    return j;
+  }finally{clearTimeout(t)}
 }
 function showNote(t){const n=$("#note");n.textContent=t;n.hidden=false}
 function hideNote(){$("#note").hidden=true}
-function initBackend(){if(!BACKEND)showNote("Scores can't be saved yet. The organiser still needs to add the Supabase settings at the top of index.html.")}
+
+/* ---------- saving a result: only an exact confirmation counts ---------- */
+// The database replies {"ok":true,"status":"finished","score":N}. Anything else = not saved yet.
+function validAck(b){return !!b&&typeof b==="object"&&b.ok===true&&b.status==="finished"&&isNum(b.score)&&b.score>=0}
+function markSaved(door,token,score){S.local["d"+door]=Object.assign({},S.local["d"+door],{status:"finished",verified:true,score:Math.round(score),token});saveLocal();delete S.pending[token];savePendingStore()}
+function markReset(door,token){const p=S.local["d"+door];if(p&&p.token===token)delete S.local["d"+door];saveLocal();delete S.pending[token];savePendingStore()}
+// Sending again is safe: the database returns the result it already saved and never awards twice.
+function sendPending(token){
+  const it=S.pending[token];if(!it)return Promise.resolve({state:"none"});
+  if(S.sending[token])return S.sending[token];
+  const run=(async()=>{
+    try{
+      const b=await rpc("finish_play",it.req);
+      if(validAck(b)){markSaved(it.door,token,b.score);return{state:"saved",score:b.score}}
+      if(b&&b.ok===false&&b.status==="not_found"){markReset(it.door,token);return{state:"reset"}}
+      it.lastError="the scoreboard didn't confirm it";
+    }catch(e){it.lastError="the scoreboard couldn't be reached"}
+    it.tries=(it.tries||0)+1;it.lastTry=Date.now();savePendingStore();
+    return{state:"pending",msg:it.lastError};
+  })().finally(()=>{delete S.sending[token];renderCal()});
+  S.sending[token]=run;return run;
+}
+function saveResult({d,who,correct,total,est,taken,ui}){
+  const prev=S.local["d"+d.n]||{},token=who.token||prev.token;
+  if(!isToken(token)){ui("pending",0,"this game has no start record");return}
+  // Keep the complete request on this device BEFORE sending, so it survives a refresh or lost connection.
+  S.pending[token]={door:d.n,title:d.title,req:{p_token:token,p_score:est,p_correct:correct,p_total:total,p_time:taken},createdAt:Date.now()};
+  const stored=savePendingStore();
+  S.local["d"+d.n]=Object.assign({},prev,{status:"started",token});saveLocal();
+  const go=async()=>{ui("saving");const r=await sendPending(token);
+    if(r.state==="saved")ui("saved",r.score);
+    else if(r.state==="reset")ui("reset");
+    else ui("pending",0,(r.msg||"not confirmed")+(stored?"":". This browser is blocking storage, so keep this page open and press Try again"),go)};
+  renderCal();go();
+}
+// On every visit: resend anything unconfirmed, then ask the database about every game this device knows.
+async function syncWithServer(){
+  if(!BACKEND)return;
+  for(const t of Object.keys(S.pending))if(isToken(t))await sendPending(t);else{delete S.pending[t];savePendingStore()}
+  const tokens=Object.values(S.local).map(p=>p&&p.token).filter(isToken).slice(0,40);
+  if(tokens.length){
+    try{
+      const rows=await rpc("play_status",{p_tokens:tokens});
+      if(Array.isArray(rows)){
+        const byTok=new Map(rows.filter(r=>r&&isToken(r.token)).map(r=>[r.token.toLowerCase(),r]));
+        for(const [k,p] of Object.entries(S.local)){
+          if(!p||!isToken(p.token)||S.pending[p.token])continue;
+          const r=byTok.get(p.token.toLowerCase());
+          if(!r)delete S.local[k];   // reset by the organiser: the door can be played again
+          else if(r.status==="finished"&&isNum(r.score))S.local[k]=Object.assign({},p,{status:"finished",verified:true,score:Math.round(r.score)});
+          else S.local[k]=Object.assign({},p,{status:"started",verified:false});
+        }
+        saveLocal();
+      }
+    }catch(e){}
+  }
+  renderCal();
+}
+function initBackend(){
+  if(!BACKEND){showNote("Scores can't be saved yet. The organiser still needs to add the Supabase settings at the top of index.html.");return}
+  syncWithServer();
+  addEventListener("online",syncWithServer);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Object.keys(S.pending).length)syncWithServer()});
+}
+
+/* ---------- how a played door looks ---------- */
+function playPoints(p){return p&&p.status==="finished"&&p.verified&&!p.pending?Math.max(0,Math.round(Number(p.score)||0)):0}
+function playLabel(p){if(p.pending)return"⏳ Not saved yet";if(p.status==="finished")return p.verified?`✓ ${playPoints(p)} pts`:"✓ Played";return"⚠️ Interrupted"}
+function playMessage(p){
+  if(p.pending)return`<p>Your result for this door <b>isn't saved yet</b>. Press <b>Try again</b> in the yellow box above the calendar.</p>`;
+  if(p.status==="finished")return`<p>You've already played this door${p.verified?` and earned <b>${playPoints(p)} ${REWARD}</b>`:""}. Come back tomorrow for the next present!</p>`;
+  return`<p>Your game on this door stopped before it finished, so it can't be restarted. If something went wrong, ask the organiser to reset it for you.</p>`;
+}
+function afterPlayedMessage(d){
+  const row=document.createElement("div");row.className="row";
+  row.innerHTML=`<button class="btn ghost" id="otherPerson">I'm someone else using this device</button>`;
+  mBody.appendChild(row);$("#otherPerson").onclick=()=>openDoor(d,false,true);
+}
+function renderPendingBar(){
+  const bar=$("#pendingBar");if(!bar)return;
+  const items=Object.entries(S.pending).filter(([t])=>isToken(t));
+  if(!items.length){bar.hidden=true;bar.innerHTML="";return}
+  bar.hidden=false;
+  bar.innerHTML=`<b>${items.length===1?"1 score is":items.length+" scores are"} waiting to be saved.</b> ${items.length===1?"It's":"They're"} kept safely on this device and will be sent automatically.`+
+    items.map(([t,it])=>`<div class="pending-item"><span>Door ${Number(it.door)||"?"}: ${esc(it.title||"")}${it.lastError?` · <span class="muted">${esc(it.lastError)}</span>`:""}</span>
+      <button class="btn" data-retry="${esc(t)}" ${S.sending[t]?"disabled":""}>${S.sending[t]?"Saving…":"Try again"}</button></div>`).join("");
+  bar.querySelectorAll("[data-retry]").forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent="Saving…";const r=await sendPending(b.dataset.retry);
+    toast(r.state==="saved"?`🎁 Saved! You earned ${Math.round(r.score)} ${REWARD}.`:r.state==="reset"?"That game was reset by the organiser. You can play it again.":"Still not saved. Please try again in a moment.")});
+}
 
 /* ================= CALENDAR ================= */
 function paperOf(d){const i=d.n-1;return PAPERS[(i*3+Math.floor(i/4))%4]}
@@ -551,7 +660,7 @@ function renderCal(){
   const now=Date.now();
   const html=DOORS.map(d=>{
     const st=stateOf(d,now),p=myPlay(d.n);let cls=`door ${paperOf(d)} `,status="",inner="",dis=false;
-    if(p&&p.status){cls+="played";status=p.status==="finished"?`✓ ${p.score} pts`:"✓ Played";inner=`<span class="gtitle">${esc(d.title)}</span>`}
+    if(p&&p.status){cls+="played";status=playLabel(p);inner=`<span class="gtitle">${esc(d.title)}</span>`}
     else if(st==="locked"){cls+="locked";status=`Opens in ${fmtDur(d.open-now)}`;inner=`<span class="bow" aria-hidden="true">🎀</span>`;dis=true}
     else if(st==="open"){cls+="open";status="Open now · tap to play";inner=`<span class="gtitle">${esc(d.title)}</span>`}
     else{cls+="closed";status="Missed · closed";inner=`<span class="gtitle">${esc(d.title)}</span>`;dis=true}
@@ -563,9 +672,9 @@ function renderCal(){
   $("#cal").innerHTML=html+`<button class="door finale ${wl?"":"open"}" disabled aria-label="Winners day">
     <span><span class="num">★</span><br><span class="date">${dayLabel(WINNERS.open)}</span></span><span class="gtitle">Winners' Grotto</span>
     <span class="st">${wl?"Winners crowned 5 Dec":"🏆 Winners crowned today!"}</span></button>`;
-  renderCountdown();
+  renderCountdown();renderPendingBar();
 }
-function myTotal(){let t=0;for(const d of DOORS){const p=myPlay(d.n);if(p&&p.score)t+=p.score}return t}
+function myTotal(){let t=0;for(const d of DOORS)t+=playPoints(myPlay(d.n));return t}
 function renderCountdown(){
   const now=Date.now(),open=DOORS.find(d=>stateOf(d,now)==="open"),next=DOORS.find(d=>now<d.open);let t;
   if(open)t=`<span>🎁 Door ${open.n} is open</span><span>Closes in <b>${fmtDur(open.close-now)}</b></span>`;
@@ -582,7 +691,7 @@ setInterval(()=>{
   renderCountdown();
 },1000);
 $("#cal").addEventListener("click",e=>{const b=e.target.closest(".door[data-n]");if(!b||b.disabled||b.classList.contains("tapped"))return;
-  const d=DOORS[+b.dataset.n-1],go=()=>{b.classList.remove("tapped");openDoor(d,S.testMode)};
+  const d=DOORS.find(x=>x.n===+b.dataset.n);if(!d)return;const _d=d,go=()=>{b.classList.remove("tapped");openDoor(d,S.testMode)};
   if(reduce){go();return}
   b.classList.add("tapped");const r=b.getBoundingClientRect();
   ["✨","⭐","✨","🌟","✨","❄️","✨","⭐","🎉","✨"].forEach((s,i)=>{const sp=document.createElement("span");sp.className="spark";sp.textContent=s;
@@ -635,8 +744,7 @@ async function openDoor(d,preview,other){
     if(stateOf(d)!=="open"){mBody.innerHTML=`<h2 id="mTitle">Door ${d.n} is closed</h2><p>This door can only be played on ${dayLabel(d.open)}, between 8am and 8pm your time. Missed doors stay closed.</p>`;return}
     const p=other?null:myPlay(d.n);
     if(p){mBody.innerHTML=`<div class="kicker">Door ${d.n} · ${dayLabel(d.open)}</div><h2 id="mTitle">${esc(d.title)}</h2>
-      <p>You've already played this door${p.status==="finished"?` and earned <b>${p.score} ${REWARD}</b>`:""}. Come back tomorrow for the next present!</p>
-      <div class="row"><button class="btn ghost" id="otherPerson">I'm someone else using this device</button></div>`;$("#otherPerson").onclick=()=>openDoor(d,false,true);return}
+      ${playMessage(p)}`;afterPlayedMessage(d);return}
     if(!canPlay()){mBody.innerHTML=`<h2 id="mTitle">Almost ready</h2><p>The scoreboard isn't connected yet, so games can't be saved. Please check back soon.</p>`;return}
   }
   await playUnwrap(d);
@@ -661,14 +769,16 @@ async function openDoor(d,preview,other){
     let k=rnd(1000),token=null;
     const reset=()=>{btn.disabled=false;btn.textContent="Start the game ▶"};
     if(!preview){
+      if(stateOf(d)!=="open"){openDoor(d,false);return}
       try{
         const res=await rpc("start_play",{p_name:n,p_dept:dp,p_door:d.n,p_tz:myTZ,p_device:deviceId});
-        if(!res||!res.ok){const why=res&&res.reason;reset();
-          if(why==="played"){err.textContent=`Our records show ${n} has already played door ${d.n}. Everyone gets one go per door.`;setLocal(d.n,{status:"started",score:0});renderCal()}
+        if(!res||res.ok!==true||!isToken(res.token)){const why=res&&res.reason;reset();
+          if(why==="played")err.textContent=`Our records show ${n} has already played door ${d.n}. Everyone gets one go per door.`;
           else if(why==="closed")err.textContent="This door isn't open right now. Each door is open from 8am to 8pm (your time) on its day.";
-          else err.textContent="Please check your full name and department and try again.";
+          else if(why==="invalid")err.textContent="Please check your full name and department and try again.";
+          else err.textContent="The scoreboard didn't accept the start. Please try again.";
           return}
-        k=res.k;token=res.token;setLocal(d.n,{status:"started",score:0,token});
+        k=Math.max(0,Math.round(Number(res.k)||0));token=res.token;setLocal(d.n,{status:"started",token,startedAt:Date.now()});
       }catch(ex){err.textContent="We couldn't reach the scoreboard. Check your internet connection and try again.";reset();return}
     }
     startGame(d,{name:n,dept:dp,token},preview,k);
@@ -683,7 +793,7 @@ function startGame(d,who,preview,k){
   mBody.innerHTML=`${flag(preview)}<div class="ghead"><span class="gt" id="mTitle">${esc(d.title)}</span><span class="score-pill" id="pts">0 pts</span></div>
     <div class="timer" id="tbar"><i style="width:100%"></i></div><div class="tleft" id="tleft"></div><div id="garea"></div>`;
   const area=$("#garea"),t0=Date.now(),total=d.time*1000;let finished=false,earnedW=0,running=0,game;
-  const award=(w,silent)=>{earnedW+=w;const share=Math.max(1,Math.round(L.max*w/(game&&game.W||1)));running=Math.min(L.max,running+share);
+  const award=(n,silent)=>{n=n||1;earnedW+=n;const share=Math.max(1,Math.round(L.max*n/(game&&game.W||1)));running=Math.min(L.max,running+share);
     $("#pts").textContent=`${running} pts`;if(!silent)toast(`🎉 Correct! +${share} ${REWARD}`);return share};
   game=GAMES[d.type](area,d,award,res=>finish(res,true),k);
   if(game.ownTimer){$("#tbar").hidden=true;$("#tleft").hidden=true}
@@ -692,18 +802,29 @@ function startGame(d,who,preview,k){
     $("#tleft").textContent=`${fmtDur(left).slice(3)} left`;if(left<=0)finish(game.state(),false)}
   function finish(res,complete){
     if(finished)return;finished=true;clearInterval(iv);game.stop&&game.stop();S.active.done=true;
-    const frac=res.frac!=null?res.frac:(game.W?earnedW/game.W:0);
-    const points=frac>0?Math.min(L.max,Math.max(MIN_PTS,Math.round(L.max*frac))):0;
-    const taken=Math.round(Math.min(d.time,(Date.now()-t0)/1000));
-    const rec={door:d.n,game:d.title,name:who.name,dept:who.dept,tz:myTZ,status:"finished",score:points,correct:res.correct,total:res.total,timeTaken:taken,
-      startedAt:(myPlay(d.n)||{}).startedAt||t0,finishedAt:Date.now()};
-    const medal=frac>=1?"🏆":frac>=.5?"⭐":"🎄";
-    mBody.innerHTML=`${flag(preview)}<div class="result"><div class="medal">${medal}</div><div class="kicker">${complete?"All done!":"Time's up!"}</div>
-      <h2 id="mTitle">${esc(d.title)}</h2><div class="big">${points}</div><div><b>${REWARD}</b> earned · ${res.correct} of ${res.total} ${esc(res.unit||"correct")} · ${taken}s</div>
-      <p class="muted">${points>0?`Congratulations ${esc(who.name.split(" ")[0])}, you just earned ${points} ${REWARD}!`:"No points this time, but there's a new present tomorrow!"}</p>
-      <div class="err" id="saveErr"></div><div class="row" style="justify-content:center"><button class="btn alt" id="backCal">Back to the calendar</button></div></div>`;
-    $("#backCal").onclick=closeModal;burst();if(points>0)toast(`🎁 You just earned ${points} ${REWARD}!`);
-    if(!preview){setLocal(d.n,{status:"finished",score:points,token:who.token});const save=()=>rpc("finish_play",{p_token:who.token,p_score:points,p_correct:res.correct,p_total:res.total,p_time:taken}).then(()=>{const e=$("#saveErr");if(e)e.textContent=""}).catch(()=>{const e=$("#saveErr");if(e){e.innerHTML=`Your score didn't save. <button class="btn ghost" id="retry">Try again</button>`;$("#retry").onclick=save}});save()}
+    const tot=Math.max(1,Math.round(Number(res.total)||1)),correct=Math.min(tot,Math.max(0,Math.round(Number(res.correct)||0)));
+    const est=pointsFor(L.max,correct,tot),taken=Math.round(Math.min(d.time,(Date.now()-t0)/1000)),runId=++RUN_SEQ;
+    const medal=correct>=tot?"🏆":correct*2>=tot?"⭐":"🎄";
+    mBody.innerHTML=`${flag(preview)}<div class="result" data-run="${runId}"><div class="medal">${medal}</div><div class="kicker">${complete?"All done!":"Time's up!"}</div>
+      <h2 id="mTitle">${esc(d.title)}</h2><div class="big" id="resPts">…</div><div>${correct} of ${tot} ${esc(res.unit||"correct")} · ${taken}s</div>
+      <div id="saveBox" class="save-box" aria-live="polite"></div><div class="row" style="justify-content:center"><button class="btn alt" id="backCal">Back to the calendar</button></div></div>`;
+    $("#backCal").onclick=closeModal;
+    const first=esc(who.name.split(" ")[0]);
+    // Only touch the screen if this exact result is still showing (a late reply must not write into another game).
+    const ui=(state,points,msg,retry)=>{
+      const node=document.querySelector(`.result[data-run="${runId}"]`);if(!node)return;
+      const big=$("#resPts"),box=$("#saveBox");
+      if(state==="saving"){big.textContent="…";box.innerHTML=`<p class="muted">Saving your score…</p>`}
+      else if(state==="saved"){big.textContent=points;
+        box.innerHTML=points>0?`<p><b>🎁 Saved! Congratulations ${first}, you just earned ${points} ${REWARD}!</b></p>`:`<p class="muted">Saved. No points this time, but there's a new present tomorrow!</p>`;
+        burst();if(points>0)toast(`🎁 You just earned ${points} ${REWARD}!`)}
+      else if(state==="preview"){big.textContent=points;box.innerHTML=`<p class="muted">Test mode: this score is not saved.</p>`}
+      else if(state==="reset"){big.textContent="–";box.innerHTML=`<p class="err">The organiser reset this game, so this result wasn't saved. You can play this door again.</p>`}
+      else{big.textContent="–";box.innerHTML=`<p class="err">⚠️ Your score isn't saved yet${msg?": "+esc(msg):"."}</p><p class="muted">It's kept on this device. We'll try again automatically next time you open the game.</p>${retry?`<button class="btn" id="retrySave">Try again now</button>`:""}`;
+        if(retry)$("#retrySave").onclick=retry}
+    };
+    if(preview){ui("preview",est);burst();return}
+    saveResult({d,who,correct,total:tot,est,taken,ui});
   }
   S.active={preview,done:false,stop:()=>{finished=true;clearInterval(iv);game.stop&&game.stop()},quit:()=>finish(game.state(),false)};
 }
@@ -753,11 +874,11 @@ function quizGame(area,d,award,done,k){
       area.querySelectorAll("#af input,#af button").forEach(x=>x.disabled=true);resolve(false,q,true)});
   }
   function resolve(ok,q,timedOut){if(q.done)return;q.done=true;stopClock();const fb=$("#fb");
-    if(ok){correct++;const p=award(DIFF[q.diff].w);fb.className="fb good";fb.textContent=`Correct! +${p} ${REWARD}${q.note?" · "+q.note:""}`}
+    if(ok){correct++;const p=award(1);fb.className="fb good";fb.textContent=`Correct! +${p} ${REWARD}${q.note?" · "+q.note:""}`}
     else{buzzer();fb.className="fb badf";fb.textContent=`${timedOut?"Time's up!":"Not quite."} The answer was ${q.answer}.${q.note?" "+q.note:""}`}
     tm=setTimeout(()=>{i++;show()},ok?900:1600)}
   show();
-  return{ownTimer:true,W:qs.reduce((a,q)=>a+DIFF[q.diff].w,0),state:()=>({correct,total:qs.length}),stop(){stopped=true;clearTimeout(tm);stopClock()}};
+  return{ownTimer:true,W:qs.length,state:()=>({correct,total:qs.length}),stop(){stopped=true;clearTimeout(tm);stopClock()}};
 }
 
 /* ---------- crossword ---------- */
@@ -809,7 +930,7 @@ function crosswordGame(area,d,award,done){
     if(wi!=null)wordCells(wi).forEach(k=>area.querySelector(`[data-k="${k}"]`).classList.add("hl"))}
   const pickWord=k=>{const cell=cells.get(k),w=cell.words.find(wi=>cw.placed[wi].dir===dir);return w!=null?w:cell.words[0]};
   function checkWords(){cw.placed.forEach((p,wi)=>{if(solved.has(wi))return;if(wordCells(wi).every(k=>inp(k).value.toUpperCase()===cells.get(k).ch)){
-      solved.add(wi);award(DIFF[lenDiff(p.word)].w);area.querySelector(`li[data-w="${wi}"]`).classList.add("done")}})}
+      solved.add(wi);award(1);area.querySelector(`li[data-w="${wi}"]`).classList.add("done")}})}
   area.querySelectorAll(".cw-cell input").forEach(el=>{const k=el.parentElement.dataset.k;
     el.addEventListener("focus",()=>{const cell=cells.get(k);if(!cell.words.some(wi=>cw.placed[wi].dir===dir))dir=cw.placed[cell.words[0]].dir;highlight(pickWord(k))});
     el.addEventListener("pointerdown",()=>{const cell=cells.get(k);if(cell.words.length>1&&document.activeElement===el){dir=dir==="a"?"d":"a";setTimeout(()=>highlight(pickWord(k)))}});
@@ -825,7 +946,7 @@ function crosswordGame(area,d,award,done){
     if(area.querySelector(".cw-cell.no"))buzzer();
     setTimeout(()=>area.querySelectorAll(".cw-cell.no,.cw-cell.ok").forEach(x=>x.classList.remove("ok","no")),1500);$("#fb").textContent=`${solved.size} of ${cw.placed.length} words solved.`};
   $("#cwDone").onclick=()=>{checkWords();done({correct:solved.size,total:cw.placed.length,unit:"words"})};
-  return{W:cw.placed.reduce((a,p)=>a+DIFF[lenDiff(p.word)].w,0),state:()=>{checkWords();return{correct:solved.size,total:cw.placed.length,unit:"words"}},stop(){area.querySelectorAll("input,button").forEach(x=>x.disabled=true)}};
+  return{W:cw.placed.length,state:()=>{checkWords();return{correct:solved.size,total:cw.placed.length,unit:"words"}},stop(){area.querySelectorAll("input,button").forEach(x=>x.disabled=true)}};
 }
 
 /* ---------- word search ---------- */
@@ -847,10 +968,10 @@ function wordsearchGame(area,d,award,done){
     const hit=place.find(p=>{if(p.found)return false;const[er,ec]=endOf(p);return(p.r===s.r&&p.c===s.c&&er===r&&ec===c)||(p.r===r&&p.c===c&&er===s.r&&ec===s.c)});
     const fb=$("#fb");
     if(hit){hit.found=true;found++;for(let i=0;i<hit.w.length;i++)btn(hit.r+hit.dr*i,hit.c+hit.dc*i).classList.add("found");
-      area.querySelector(`.ws-list [data-i="${place.indexOf(hit)}"]`).classList.add("found");const p=award(DIFF[lenDiff(hit.w)].w);fb.className="fb good";fb.textContent=`Found ${hit.w}! +${p} ${REWARD}`;
+      area.querySelector(`.ws-list [data-i="${place.indexOf(hit)}"]`).classList.add("found");const p=award(1);fb.className="fb good";fb.textContent=`Found ${hit.w}! +${p} ${REWARD}`;
       if(found===place.length)setTimeout(()=>done({correct:found,total:place.length,unit:"words found"}),600)}
     else{buzzer();fb.className="fb badf";fb.textContent="That's not one of the words. Try again."}});
-  return{W:place.reduce((a,p)=>a+DIFF[lenDiff(p.w)].w,0),state:()=>({correct:found,total:place.length,unit:"words found"}),stop(){area.querySelectorAll("button").forEach(x=>x.disabled=true)}};
+  return{W:place.length,state:()=>({correct:found,total:place.length,unit:"words found"}),stop(){area.querySelectorAll("button").forEach(x=>x.disabled=true)}};
 }
 
 /* ---------- memory ---------- */
@@ -886,7 +1007,7 @@ function findElfGame(area,d,award,done){
     sc.addEventListener("click",e=>{if(stopped||settled)return;const rect=sc.getBoundingClientRect(),x=(e.clientX-rect.left)/rect.width*100,y=(e.clientY-rect.top)/rect.height*100;
       const elf=e.target.closest(".elf");
       if(elf&&!elf.classList.contains("found")){settled=true;stopClock();$("#skipScene").disabled=true;elf.classList.add("found");found++;const ring=document.createElement("span");ring.className="ring";ring.style.left=elf.style.left;ring.style.top=elf.style.top;sc.appendChild(ring);
-        const p=award(weights[r]);$("#fb").className="fb good";$("#fb").textContent=`You found the elf! +${p} ${REWARD}`;r++;tm=setTimeout(scene,1300)}
+        const p=award(1);$("#fb").className="fb good";$("#fb").textContent=`You found the elf! +${p} ${REWARD}`;r++;tm=setTimeout(scene,1300)}
       else if(!elf){const m=document.createElement("span");m.className="miss";m.textContent="✗";m.style.left=x+"%";m.style.top=y+"%";sc.appendChild(m);setTimeout(()=>m.remove(),1000);
         buzzer();$("#fb").className="fb badf";$("#fb").textContent="That's not the elf. Keep looking!"}});
     const giveUp=timedOut=>{if(settled)return;settled=true;stopClock();const elf=sc.querySelector(".elf");elf.style.filter="drop-shadow(0 0 6px red) drop-shadow(0 0 12px red)";elf.style.zIndex=999;
@@ -895,7 +1016,7 @@ function findElfGame(area,d,award,done){
     stopClock=qClock(()=>giveUp(true));
   }
   scene();
-  return{ownTimer:true,W:weights.reduce((a,b)=>a+b,0),state:()=>({correct:found,total:R,unit:"elves found"}),stop(){stopped=true;clearTimeout(tm);stopClock()}};
+  return{ownTimer:true,W:R,state:()=>({correct:found,total:R,unit:"elves found"}),stop(){stopped=true;clearTimeout(tm);stopClock()}};
 }
 
 /* ---------- picture puzzles ---------- */
@@ -975,7 +1096,7 @@ function wordGuessGame(area,d,award,done,k){
       const [ans]=words[wi],m=rate(cur,ans);grid.push(cur);marks.push(m);
       [...cur].forEach((c,i)=>{const s=m[i];if(s==="ok"||(s==="near"&&keys[c]!=="ok")||(!keys[c]))keys[c]=s});
       const g=cur;cur="";
-      if(g===ans){locked=true;solved++;const p=award(R-row);draw(`🎉 ${ans}! +${p} ${REWARD}`,"good");tm=setTimeout(next,1500);return}
+      if(g===ans){locked=true;solved++;const p=award(1);draw(`🎉 ${ans}! +${p} ${REWARD}`,"good");tm=setTimeout(next,1500);return}
       row++;
       if(row>=R){locked=true;buzzer();draw(`Out of guesses. The word was ${ans}.`,"badf");tm=setTimeout(next,1900);return}
       draw();return}
@@ -988,7 +1109,7 @@ function wordGuessGame(area,d,award,done,k){
   document.addEventListener("keydown",onKey);
   area.addEventListener("click",e=>{const b=e.target.closest(".wg-k");if(b)press(b.dataset.k)});
   draw();
-  return{W:R*words.length,state:()=>({correct:solved,total:words.length,unit:"words guessed"}),stop(){stopped=true;clearTimeout(tm);document.removeEventListener("keydown",onKey)}};
+  return{W:words.length,state:()=>({correct:solved,total:words.length,unit:"words guessed"}),stop(){stopped=true;clearTimeout(tm);document.removeEventListener("keydown",onKey)}};
 }
 
 /* ---------- 6x6 Christmas sudoku (rows, columns and 2x3 boxes each hold 1–6 once) ---------- */
@@ -1032,83 +1153,115 @@ function sudokuGame(area,d,award,done){
 const GAMES={quiz:quizGame,unscramble:quizGame,carol:quizGame,finale:quizGame,crossword:crosswordGame,wordsearch:wordsearchGame,memory:memoryGame,findelf:findElfGame,jigsaw:jigsawGame,slide:slideGame,wordguess:wordGuessGame,sudoku:sudokuGame};
 
 /* ================= ORGANISER ================= */
+const int=v=>{const n=Math.round(Number(v));return Number.isFinite(n)?n:0};
+const txt=v=>typeof v==="string"?v:v==null?"":String(v);
+const ttDate=t=>t?new Date(t).toLocaleDateString("en-GB",{timeZone:HOME_TZ,day:"2-digit",month:"short",year:"numeric"}):"";
+const FLAG_TEXT={late:"Finished long after the time limit",odd_total:"Unusual number of questions reported",practice:"Practice door (0 points)"};
 function allPlays(){return S.all}
-const rankSort=(a,b)=>(b.score||0)-(a.score||0)||(a.timeTaken||9e9)-(b.timeTaken||9e9)||(a.finishedAt||9e15)-(b.finishedAt||9e15);
+const rankSort=(a,b)=>b.score-a.score||(a.timeTaken??9e9)-(b.timeTaken??9e9)||(a.finishedAt||9e15)-(b.finishedAt||9e15);
 function overall(){const m=new Map();for(const p of allPlays()){const o=m.get(p.uid)||{uid:p.uid,name:p.name,dept:p.dept,doors:0,score:0,time:0,last:0};
-  o.doors++;o.score+=p.score||0;o.time+=p.timeTaken||0;if((p.startedAt||0)>=o.last){o.last=p.startedAt||0;o.name=p.name;o.dept=p.dept}m.set(p.uid,o)}
+  o.doors++;o.score+=p.score;o.time+=p.timeTaken||0;if(p.startedAt>=o.last){o.last=p.startedAt;o.name=p.name;o.dept=p.dept}m.set(p.uid,o)}
   return[...m.values()].sort((a,b)=>b.score-a.score||a.time-b.time)}
+// Things a person should look at before awarding points.
+function needsChecking(){
+  const out=[],plays=allPlays();
+  for(const p of plays)for(const f of p.flags)out.push({p,why:FLAG_TEXT[f]||f});
+  const byDev=new Map();for(const p of plays){if(!p.device)continue;const k=p.device+"|"+p.door;(byDev.get(k)||byDev.set(k,[]).get(k)).push(p)}
+  for(const g of byDev.values()){const names=new Set(g.map(p=>p.uid));if(names.size>1)g.forEach(p=>out.push({p,why:`Same device played door ${p.door} under ${names.size} different names`}))}
+  const simple=s=>s.toLowerCase().replace(/[^a-z ]/g,"").split(" ").filter(Boolean),firstLast=s=>{const w=simple(s);return w.length?w[0]+" "+w[w.length-1]:""};
+  const byFL=new Map();for(const p of plays){const k=firstLast(p.name);if(!k)continue;(byFL.get(k)||byFL.set(k,new Set()).get(k)).add(p.uid)}
+  for(const p of plays){const set=byFL.get(firstLast(p.name));if(set&&set.size>1)out.push({p,why:`Look-alike names: ${[...set].join(" / ")}`})}
+  const seen=new Set();return out.filter(x=>{const k=x.p.uid+"|"+x.p.door+"|"+x.why;if(seen.has(k))return false;seen.add(k);return true})
+    .sort((a,b)=>a.p.door-b.p.door||a.p.name.localeCompare(b.p.name));
+}
 async function loadResults(){
   if(!BACKEND||!S.adminCode)return;
-  try{const rows=await rpc("admin_results",{p_code:S.adminCode});
-    S.all=(rows||[]).map(r=>({uid:r.player_key,name:r.name,dept:r.dept,door:r.door,game:r.game,status:r.status,score:r.score,correct:r.correct,total:r.total,
-      timeTaken:r.time_taken,tz:r.tz,startedAt:r.started_at?Date.parse(r.started_at):0,finishedAt:r.finished_at?Date.parse(r.finished_at):0}));
-    S.loadErr="";S.loadedAt=Date.now()}
-  catch(e){S.loadErr="Couldn't load the results: "+e.message}
+  try{
+    const r=await rpc("admin_results",{p_code:S.adminCode});
+    if(!r||r.ok!==true||!Array.isArray(r.rows)){S.loadErr=r&&r.error==="locked"?"Too many wrong codes were tried from this network. Wait 15 minutes, then refresh.":"Couldn't load the results.";}
+    else{
+      S.all=r.rows.filter(x=>x&&typeof x==="object").map(x=>({uid:txt(x.player_key),name:txt(x.name),dept:txt(x.dept),door:int(x.door),game:txt(x.game),status:txt(x.status),
+        score:Math.max(0,int(x.score)),correct:Math.max(0,int(x.correct)),total:Math.max(0,int(x.total)),timeTaken:x.time_taken==null?null:Math.max(0,int(x.time_taken)),
+        tz:txt(x.tz),device:txt(x.device_id),flags:txt(x.flags).split(",").filter(Boolean),
+        startedAt:x.started_at?Date.parse(x.started_at)||0:0,finishedAt:x.finished_at?Date.parse(x.finished_at)||0:0}));
+      S.loadErr="";S.loadedAt=Date.now();
+    }
+  }catch(e){S.loadErr="Couldn't reach the scoreboard. Check your connection."}
   renderAdmin();
 }
 function renderAdmin(){
   if(!S.adminUnlocked)return;
-  const plays=allPlays(),ov=overall(),sel=S.adminDoor;
+  const plays=allPlays(),ov=overall(),sel=S.adminDoor,chk=needsChecking();
   const rows=(sel==="all"?plays.slice():plays.filter(p=>p.door===+sel)).sort((a,b)=>sel==="all"?(a.door-b.door)||rankSort(a,b):rankSort(a,b));
   const status=S.loadErr?`<span style="color:var(--bad)">${esc(S.loadErr)}</span>`:S.loadedAt?`Updated ${new Date(S.loadedAt).toLocaleTimeString("en-GB")} · refreshes every 30 seconds`:"Loading results…";
   $("#viewAdmin").innerHTML=`<div class="admin">
    <section class="panel"><h3>Test everything</h3>
-    <p class="muted" style="margin-top:0">Test mode opens every door in the calendar so you can play them all now, including locked and closed ones. Nothing you play in test mode is recorded, and only you can see it.</p>
+    <p class="muted" style="margin-top:0">Test mode opens every door so you can play them all now. Nothing you play in test mode is sent to the scoreboard, and only you can see it.</p>
     <div class="row" style="margin-top:0"><button class="btn ${S.testMode?"ghost":"alt"}" id="testToggle">${S.testMode?"Turn test mode off":"Turn on test mode"}</button></div>
     <div class="row"><select id="pvDoor" aria-label="Door to test">${DOORS.map(d=>`<option value="${d.n}">Door ${d.n} · ${esc(d.title)}</option>`).join("")}</select><button class="btn ghost" id="pvGo">Play this door now</button></div></section>
    <section class="panel"><h3>Organiser dashboard</h3>
     <p class="muted" style="margin-top:0">${status} <button class="linkbtn" id="refresh" style="color:var(--pine)">Refresh now</button></p>
     <div class="stats"><div class="stat"><b>${ov.length}</b>Players</div><div class="stat"><b>${plays.length}</b>Games played</div>
-     <div class="stat"><b>${plays.reduce((a,p)=>a+(p.score||0),0).toLocaleString("en-GB")}</b>${REWARD} awarded</div></div>
-    <div class="row"><button class="btn gold" id="xls">⬇ Download results (Excel)</button><span class="muted" id="xlsMsg">Overall leaderboard, daily winners and every entry. Times are in Trinidad &amp; Tobago time.</span></div></section>
+     <div class="stat"><b>${plays.reduce((a,p)=>a+p.score,0).toLocaleString("en-GB")}</b>${REWARD} awarded</div><div class="stat"><b>${chk.length}</b>Entries to check</div></div>
+    <div class="row"><button class="btn gold" id="xls">⬇ Download results (Excel)</button><span class="muted" id="xlsMsg">Leaderboard, daily winners, every entry and a "Needs Checking" list. Times are in Trinidad &amp; Tobago time.</span></div></section>
+   ${chk.length?`<section class="panel"><h3>Needs checking before awarding</h3><p class="muted" style="margin-top:0">These aren't necessarily cheating. Please take a quick look before awarding points.</p><div class="tbl-wrap"><table><thead><tr><th>Door</th><th>Full name</th><th>Department</th><th>${REWARD}</th><th>Why</th></tr></thead>
+    <tbody>${chk.slice(0,50).map(x=>`<tr><td>${x.p.door}</td><td>${esc(x.p.name)}</td><td>${esc(x.p.dept)}</td><td>${x.p.score}</td><td>${esc(x.why)}</td></tr>`).join("")}</tbody></table></div></section>`:""}
    <section class="panel"><h3>Overall leaderboard</h3><div class="tbl-wrap"><table><thead><tr><th>#</th><th>Full name</th><th>Department</th><th>Doors</th><th>${REWARD}</th><th>Total time</th></tr></thead>
     <tbody>${ov.slice(0,25).map((o,i)=>`<tr><td>${i+1}</td><td>${esc(o.name)}</td><td>${esc(o.dept)}</td><td>${o.doors}</td><td><b>${o.score}</b></td><td>${o.time}s</td></tr>`).join("")||`<tr><td colspan="6" class="muted">No one has played yet.</td></tr>`}</tbody></table></div></section>
    <section class="panel"><h3>Entries</h3>
     <div class="row" style="margin-top:0"><label for="adDoor" class="muted">Show</label><select id="adDoor"><option value="all">All doors</option>${DOORS.map(d=>`<option value="${d.n}" ${String(d.n)===sel?"selected":""}>Door ${d.n} · ${esc(d.title)}</option>`).join("")}</select></div>
-    <p class="muted">Use <b>Reset</b> to let someone play a door again, for example if their connection dropped.</p>
-    <div class="tbl-wrap"><table><thead><tr>${sel==="all"?"<th>Door</th>":"<th>Rank</th>"}<th>Full name</th><th>Department</th><th>${REWARD}</th><th>Result</th><th>Time</th><th>Status</th><th>Finished (TT)</th><th>Player time zone</th><th></th></tr></thead>
-    <tbody>${rows.map((p,i)=>`<tr><td>${sel==="all"?p.door:i+1}</td><td>${esc(p.name)}</td><td>${esc(p.dept)}</td><td><b>${p.score||0}</b></td><td>${p.correct||0}/${p.total||0}</td><td>${p.timeTaken!=null?p.timeTaken+"s":""}</td><td>${p.status==="finished"?"Finished":"Left early"}</td><td>${esc(homeTime(p.finishedAt))}</td><td>${esc(p.tz||"")}</td>
-      <td><button class="btn ghost reset" style="padding:4px 10px;font-size:.8rem" data-key="${esc(p.uid)}" data-door="${p.door}">Reset</button></td></tr>`).join("")||`<tr><td colspan="10" class="muted">No entries yet.</td></tr>`}</tbody></table></div></section>
+    <p class="muted">Use <b>Reset</b> to let someone play a door again, for example if their game was interrupted. Their device updates the next time they open the game.</p>
+    <div class="tbl-wrap"><table><thead><tr>${sel==="all"?"<th>Door</th>":"<th>Rank</th>"}<th>Game</th><th>Full name</th><th>Department</th><th>${REWARD}</th><th>Result</th><th>Time</th><th>Status</th><th>Date played (TT)</th><th>Finished (TT)</th><th>Flags</th><th></th></tr></thead>
+    <tbody>${rows.map((p,i)=>`<tr><td>${sel==="all"?p.door:i+1}</td><td>${esc(p.game)}</td><td>${esc(p.name)}</td><td>${esc(p.dept)}</td><td><b>${p.score}</b></td><td>${p.correct}/${p.total}</td><td>${p.timeTaken!=null?p.timeTaken+"s":""}</td><td>${p.status==="finished"?"Finished":"Not finished"}</td><td>${esc(ttDate(p.startedAt))}</td><td>${esc(homeTime(p.finishedAt))}</td><td>${esc(p.flags.map(f=>FLAG_TEXT[f]||f).join("; "))}</td>
+      <td><button class="btn ghost reset" style="padding:4px 10px;font-size:.8rem" data-key="${esc(p.uid)}" data-door="${p.door}">Reset</button></td></tr>`).join("")||`<tr><td colspan="12" class="muted">No entries yet.</td></tr>`}</tbody></table></div></section>
   </div>`;
   $("#testToggle").onclick=()=>setTestMode(!S.testMode);
   $("#adDoor").onchange=e=>{S.adminDoor=e.target.value;renderAdmin()};
-  $("#pvGo").onclick=()=>openDoor(DOORS[+$("#pvDoor").value-1],true);
+  $("#pvGo").onclick=()=>{const d=DOORS.find(x=>x.n===+$("#pvDoor").value);if(d)openDoor(d,true)};
   $("#xls").onclick=exportXlsx;
   $("#refresh").onclick=loadResults;
   $("#viewAdmin").querySelectorAll(".reset").forEach(b=>b.onclick=async()=>{
     if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Confirm reset";b.style.borderColor="var(--bad)";return}
     b.disabled=true;b.textContent="Resetting…";
-    try{await rpc("admin_reset_play",{p_code:S.adminCode,p_player_key:b.dataset.key,p_door:+b.dataset.door});toast("Entry reset. They can play that door again.")}catch(e){toast("Couldn't reset: "+e.message)}
+    try{const r=await rpc("admin_reset_play",{p_code:S.adminCode,p_player_key:b.dataset.key,p_door:int(b.dataset.door)});
+      toast(r&&r.ok?"Entry reset. They can play that door again.":r&&r.error==="locked"?"Locked out after too many wrong codes. Try again in 15 minutes.":"Couldn't reset that entry.")}
+    catch(e){toast("Couldn't reach the scoreboard to reset.")}
     loadResults()});
 }
-function exportXlsx(){
-  const msg=$("#xlsMsg");
-  if(!window.XLSX){msg.textContent="The Excel tool didn't load. Reload the page and try again.";return}
-  const plays=allPlays().slice(),ov=overall(),wb=XLSX.utils.book_new();
+// The Excel library is only downloaded when an organiser asks for the file, and the browser checks it hasn't been tampered with.
+const XLSX_SRC="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",XLSX_SRI="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw";
+function loadXlsx(){if(window.XLSX)return Promise.resolve();return new Promise((res,rej)=>{const s=document.createElement("script");s.src=XLSX_SRC;s.integrity=XLSX_SRI;s.crossOrigin="anonymous";s.referrerPolicy="no-referrer";s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+async function exportXlsx(){
+  const msg=$("#xlsMsg");msg.textContent="Preparing the Excel file…";
+  try{await loadXlsx()}catch(e){msg.textContent="The Excel tool didn't load. Check your connection and try again.";return}
+  const plays=allPlays().slice(),ov=overall(),chk=needsChecking(),wb=XLSX.utils.book_new();
+  const doorDate=n=>{const d=DOORS.find(x=>x.n===n);return d?d.date:""};
   const sheet=(rows,widths,name)=>{const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=widths.map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,name)};
-  sheet([["Rank","Full Name","Department","Doors Played",REWARD,"Total Time (s)"],...ov.map((o,i)=>[i+1,o.name,o.dept,o.doors,o.score,o.time])],[6,28,24,12,14,14],"Overall Leaderboard");
-  const daily=[["Door","Date","Game","Place","Full Name","Department",REWARD,"Result","Out Of","Time (s)"]];
-  DOORS.forEach(d=>plays.filter(p=>p.door===d.n&&p.status==="finished").sort(rankSort).slice(0,3).forEach((p,i)=>daily.push([d.n,d.date,d.title,i+1,p.name,p.dept,p.score,p.correct,p.total,p.timeTaken])));
-  sheet(daily,[6,12,30,7,28,24,14,9,8,9],"Daily Winners");
-  sheet([["Door","Date","Game","Full Name","Department",REWARD,"Result","Out Of","Time Taken (s)","Status","Started (TT time)","Finished (TT time)","Player Time Zone"],
-    ...plays.sort((a,b)=>a.door-b.door||rankSort(a,b)).map(p=>[p.door,(DOORS[p.door-1]||{}).date,p.game,p.name,p.dept,p.score||0,p.correct||0,p.total||0,p.timeTaken??"",p.status==="finished"?"Finished":"Left early",homeTime(p.startedAt),homeTime(p.finishedAt),p.tz||""])],
-    [6,12,30,28,24,14,9,8,14,12,22,22,22],"All Entries");
+  sheet([["Rank","Full Name","Department","Games Played",REWARD,"Total Time (s)"],...ov.map((o,i)=>[i+1,o.name,o.dept,o.doors,o.score,o.time])],[6,28,24,13,14,14],"Overall Leaderboard");
+  const daily=[["Door","Game","Game Date","Place","Full Name","Department","Date Played (TT)",REWARD,"Result","Out Of","Time (s)","Flags"]];
+  DOORS.forEach(d=>plays.filter(p=>p.door===d.n&&p.status==="finished").sort(rankSort).slice(0,3).forEach((p,i)=>daily.push([d.n,d.title,d.date,i+1,p.name,p.dept,ttDate(p.startedAt),p.score,p.correct,p.total,p.timeTaken??"",p.flags.map(f=>FLAG_TEXT[f]||f).join("; ")])));
+  sheet(daily,[6,30,12,7,28,24,16,14,9,8,9,36],"Daily Winners");
+  sheet([["Door","Game","Game Date","Full Name","Department","Date Played (TT)",REWARD,"Result","Out Of","Time Taken (s)","Status","Started (TT time)","Finished (TT time)","Player Time Zone","Flags"],
+    ...plays.sort((a,b)=>a.door-b.door||rankSort(a,b)).map(p=>[p.door,p.game,doorDate(p.door),p.name,p.dept,ttDate(p.startedAt),p.score,p.correct,p.total,p.timeTaken??"",p.status==="finished"?"Finished":"Not finished",homeTime(p.startedAt),homeTime(p.finishedAt),p.tz,p.flags.map(f=>FLAG_TEXT[f]||f).join("; ")])],
+    [6,30,12,28,24,16,14,9,8,14,13,22,22,22,36],"All Entries");
+  sheet([["Door","Game","Full Name","Department","Date Played (TT)",REWARD,"Why it needs checking"],...chk.map(x=>[x.p.door,x.p.game,x.p.name,x.p.dept,ttDate(x.p.startedAt),x.p.score,x.why])],[6,30,28,24,16,14,50],"Needs Checking");
   const fname=`christmas-blitz-results-${new Date().toISOString().slice(0,10)}.xlsx`;
   try{XLSX.writeFile(wb,fname);msg.textContent="Downloaded "+fname}catch(e){msg.textContent="The download didn't start. Please try again."}
 }
-/* organiser login: the code is checked by the database, so it never appears in this page */
+/* organiser login: the code is checked by the database and kept only in this page's memory (never stored) */
 let refreshTimer=null;
-function setTestMode(on){S.testMode=on;$("#testbar").hidden=!on;renderCal();renderAdmin();if(on){window.scrollTo({top:0,behavior:"smooth"});toast("Test mode on: tap any door to play it")}}
-function unlockOrg(code){S.adminUnlocked=true;S.adminCode=code;try{sessionStorage.setItem("blitz.orgcode",code)}catch(e){}
+function setTestMode(on){S.testMode=!!on&&S.adminUnlocked;$("#testbar").hidden=!S.testMode;renderCal();renderAdmin();if(S.testMode){window.scrollTo({top:0,behavior:"smooth"});toast("Test mode on: tap any door to play it")}}
+function unlockOrg(code){S.adminUnlocked=true;S.adminCode=code;
   $("#orgForm").hidden=true;$("#orgOpen").hidden=true;$("#orgLock").hidden=false;$("#viewAdmin").hidden=false;renderAdmin();loadResults();
   clearInterval(refreshTimer);refreshTimer=setInterval(loadResults,30000)}
 $("#orgOpen").onclick=()=>{const f=$("#orgForm");f.hidden=!f.hidden;$("#orgOpen").setAttribute("aria-expanded",String(!f.hidden));if(!f.hidden)$("#orgCode").focus()};
 $("#orgForm").onsubmit=async e=>{e.preventDefault();const code=$("#orgCode").value.trim(),err=$("#orgErr");
   if(!BACKEND){err.textContent="The scoreboard isn't connected yet. Add your Supabase settings at the top of index.html first.";return}
   err.textContent="Checking…";
-  try{await rpc("admin_results",{p_code:code})}catch(x){err.textContent=x.status===401||/organiser code/i.test(x.message)?"That code isn't right. Please try again.":"Couldn't reach the scoreboard: "+x.message;return}
+  let r;try{r=await rpc("admin_results",{p_code:code})}catch(x){err.textContent="Couldn't reach the scoreboard. Check your connection.";return}
+  if(!r||r.ok!==true){err.textContent=r&&r.error==="locked"?"Too many wrong codes from this network. Please wait 15 minutes.":"That code isn't right. Please try again.";return}
   err.textContent="";$("#orgCode").value="";unlockOrg(code);$("#viewAdmin").scrollIntoView({behavior:"smooth"})};
-$("#orgLock").onclick=()=>{S.adminUnlocked=false;S.adminCode=null;clearInterval(refreshTimer);try{sessionStorage.removeItem("blitz.orgcode")}catch(e){}
+$("#orgLock").onclick=()=>{S.adminUnlocked=false;S.adminCode=null;S.all=[];clearInterval(refreshTimer);
   if(S.testMode)setTestMode(false);$("#viewAdmin").hidden=true;$("#viewAdmin").innerHTML="";$("#orgLock").hidden=true;$("#orgOpen").hidden=false};
 $("#testOff").onclick=()=>setTestMode(false);
 
@@ -1165,9 +1318,10 @@ function loop(now){
 }
 requestAnimationFrame(loop);
 
-try{const c=sessionStorage.getItem("blitz.orgcode");if(c&&BACKEND)unlockOrg(c)}catch(e){}
+
 renderCal();
 initBackend();
+document.querySelectorAll(".track").forEach(t=>[...t.children].forEach(i=>{const c=i.cloneNode();c.alt="";c.setAttribute("aria-hidden","true");c.classList.add("dup");t.appendChild(c)}));
 </script>
 </body>
 </html>
