@@ -15,7 +15,7 @@
 }
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZUOu4FjOWCPWhFmZprdsaPqizO1NshSRmJ4JD614Zsg=' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-tXOH4t/KfcU7P3MfYwQ5VyKVJq+ilrO8Vp1cOoeo0IA=' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="Christmas Blitz: a festive advent calendar of daily games.">
 <title>Christmas Blitz</title>
@@ -338,7 +338,7 @@ select{font:inherit;padding:9px 10px;border-radius:10px;border:2px solid #cfd8d3
         <li>One door opens each day at <b>8am</b> and closes at <b>8pm</b>, in your own time zone. There are no games on Sundays.</li>
         <li>Enter your full name and department before every game.</li>
         <li>Questions are shared out so the people playing before and after you get a different set.</li>
-        <li>You get 30 seconds for each question. Puzzles have one short timer. You get one go per door.</li>
+        <li>You get 25 seconds for each question. Puzzles have one short timer. You get one go per door.</li>
         <li>A missed door stays closed. You can't go back to it.</li>
         <li>Every game is worth 50 to 200 Nectar points. Harder games are worth more. Get at least one answer right to earn the minimum 50.</li>
         <li>Winners are crowned on Saturday 5 December.</li>
@@ -403,7 +403,7 @@ const PAPERS=["p0","p1","p2","p3"];
 // Timing: question-style games give 30 s per question (or per elf scene); puzzles get one short overall timer (seconds).
 const PERQ={quiz:1,unscramble:1,carol:1,finale:1,findelf:1};
 const PUZZLE_TIME={crossword:180,wordsearch:150,memory:90,jigsaw:120,slide:150,wordguess:240,sudoku:300};
-DOORS.forEach(d=>{if(d.type==="finale")d.count=10;if(d.type==="findelf")d.count=5;d.time=PERQ[d.type]?d.count*32+5:PUZZLE_TIME[d.type]});
+DOORS.forEach(d=>{if(d.type==="finale")d.count=10;if(d.type==="findelf")d.count=5;d.time=PERQ[d.type]?d.count*27+5:PUZZLE_TIME[d.type]});
 
 /* ================= CONTENT POOLS (Caribbean & US audience) ================= */
 // [question, correct, wrong1, wrong2, wrong3, difficulty]
@@ -865,7 +865,7 @@ function buildQuestions(d,k){
   }
 }
 // 30-second countdown for each question / scene. Renders into #qbar/#qleft; calls onExpire once at zero.
-const QSEC=30;
+const QSEC=25;
 function qClock(onExpire){const end=Date.now()+QSEC*1000;let iv=setInterval(()=>{const left=Math.max(0,end-Date.now()),b=$("#qbar");if(!b){clearInterval(iv);return}
     b.querySelector("i").style.width=(left/(QSEC*10))+"%";b.classList.toggle("low",left<10000);$("#qleft").textContent=`${Math.ceil(left/1000)}s left`;
     if(left<=0){clearInterval(iv);onExpire()}},200);return()=>clearInterval(iv)}
@@ -1218,13 +1218,13 @@ function renderAdmin(){
     <p class="muted" style="margin-top:0">${status} <button class="linkbtn" id="refresh" style="color:var(--pine)">Refresh now</button></p>
     <div class="stats"><div class="stat"><b>${ov.length}</b>Players</div><div class="stat"><b>${plays.length}</b>Games played</div>
      <div class="stat"><b>${plays.reduce((a,p)=>a+p.score,0).toLocaleString("en-GB")}</b>${REWARD} awarded</div><div class="stat"><b>${chk.length}</b>Entries to check</div></div>
-    <div class="row"><button class="btn gold" id="xls">⬇ Download results (Excel)</button><span class="muted" id="xlsMsg">Leaderboard, daily winners, every entry and a "Needs Checking" list. Times are in Trinidad &amp; Tobago time.</span></div></section>
+    <div class="row"><button class="btn gold" id="xls">⬇ Download results (Excel)</button><span class="muted" id="xlsMsg">Leaderboard, daily winners, every entry, a "Needs Checking" list and a tab for each door. Times are in Trinidad &amp; Tobago time.</span></div></section>
    ${chk.length?`<section class="panel"><h3>Needs checking before awarding</h3><p class="muted" style="margin-top:0">These aren't necessarily cheating. Please take a quick look before awarding points.</p><div class="tbl-wrap"><table><thead><tr><th>Door</th><th>Full name</th><th>Department</th><th>${REWARD}</th><th>Why</th></tr></thead>
     <tbody>${chk.slice(0,50).map(x=>`<tr><td>${x.p.door}</td><td>${esc(x.p.name)}</td><td>${esc(x.p.dept)}</td><td>${x.p.score}</td><td>${esc(x.why)}</td></tr>`).join("")}</tbody></table></div></section>`:""}
    <section class="panel"><h3>Overall leaderboard</h3><div class="tbl-wrap"><table><thead><tr><th>#</th><th>Full name</th><th>Department</th><th>Doors</th><th>${REWARD}</th><th>Total time</th></tr></thead>
     <tbody>${ov.slice(0,25).map((o,i)=>`<tr><td>${i+1}</td><td>${esc(o.name)}</td><td>${esc(o.dept)}</td><td>${o.doors}</td><td><b>${o.score}</b></td><td>${o.time}s</td></tr>`).join("")||`<tr><td colspan="6" class="muted">No one has played yet.</td></tr>`}</tbody></table></div></section>
    <section class="panel"><h3>Entries</h3>
-    <div class="row" style="margin-top:0"><label for="adDoor" class="muted">Show</label><select id="adDoor"><option value="all">All doors</option>${DOORS.map(d=>`<option value="${d.n}" ${String(d.n)===sel?"selected":""}>Door ${d.n} · ${esc(d.title)}</option>`).join("")}</select></div>
+    <div class="row" style="margin-top:0"><label for="adDoor" class="muted">Show</label><select id="adDoor"><option value="all">All doors</option>${DOORS.map(d=>`<option value="${d.n}" ${String(d.n)===sel?"selected":""}>Door ${d.n} · ${esc(d.title)}</option>`).join("")}</select><button class="btn gold" id="xlsDoor" ${sel==="all"?"disabled":""}>⬇ Download this door (Excel)</button><span class="muted" id="xlsDoorMsg">${sel==="all"?"Choose a door to download just that game's results.":""}</span></div>
     <p class="muted">Use <b>Reset</b> to let someone play a door again, for example if their game was interrupted. Their device updates the next time they open the game.</p>
     <div class="tbl-wrap"><table><thead><tr>${sel==="all"?"<th>Door</th>":"<th>Rank</th>"}<th>Game</th><th>Full name</th><th>Department</th><th>${REWARD}</th><th>Result</th><th>Time</th><th>Status</th><th>Date played (TT)</th><th>Completed (TT)</th><th>Flags</th><th></th></tr></thead>
     <tbody>${rows.map((p,i)=>`<tr><td>${sel==="all"?p.door:i+1}</td><td>${esc(p.game)}</td><td>${esc(p.name)}</td><td>${esc(p.dept)}</td><td><b>${p.score}</b></td><td>${p.correct}/${p.total}</td><td>${p.timeTaken!=null?p.timeTaken+"s":""}</td><td>${p.status==="finished"?"Finished":"Not finished"}</td><td>${esc(ttDate(p.startedAt))}</td><td>${esc(homeTime(p.finishedAt))}</td><td>${esc(p.flags.map(f=>FLAG_TEXT[f]||f).join("; "))}</td>
@@ -1233,7 +1233,8 @@ function renderAdmin(){
   $("#testToggle").onclick=()=>setTestMode(!S.testMode);
   $("#adDoor").onchange=e=>{S.adminDoor=e.target.value;renderAdmin()};
   $("#pvGo").onclick=()=>{const d=DOORS.find(x=>x.n===+$("#pvDoor").value);if(d)openDoor(d,true)};
-  $("#xls").onclick=exportXlsx;
+  $("#xls").onclick=()=>exportXlsx();
+  $("#xlsDoor").onclick=()=>{const d=DOORS.find(x=>x.n===+S.adminDoor);if(d)exportDoorXlsx(d)};
   $("#refresh").onclick=loadResults;
   $("#viewAdmin").querySelectorAll(".reset").forEach(b=>b.onclick=async()=>{
     if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Confirm reset";b.style.borderColor="var(--bad)";return}
@@ -1246,6 +1247,26 @@ function renderAdmin(){
 // The Excel library is only downloaded when an organiser asks for the file, and the browser checks it hasn't been tampered with.
 const XLSX_SRC="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",XLSX_SRI="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw";
 function loadXlsx(){if(window.XLSX)return Promise.resolve();return new Promise((res,rej)=>{const s=document.createElement("script");s.src=XLSX_SRC;s.integrity=XLSX_SRI;s.crossOrigin="anonymous";s.referrerPolicy="no-referrer";s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+// ---- Per-door results (download only; scores are read, never changed) ----
+const DOOR_HEAD=["Rank","Full Name","Department","Date Played (TT)","Date Completed (TT)",REWARD,"Result","Out Of","Time Taken (s)","Status","Started (TT time)","Finished (TT time)","Player Time Zone","Flags"];
+const DOOR_COLS=[6,28,24,16,19,14,9,8,14,13,22,22,22,36];
+// Finished games ranked (points, then fastest); unfinished games listed underneath without a rank.
+function doorSheetRows(d,plays){
+  const mine=plays.filter(p=>p.door===d.n),done=mine.filter(p=>p.status==="finished").sort(rankSort),open=mine.filter(p=>p.status!=="finished").sort((a,b)=>a.startedAt-b.startedAt);
+  const row=(p,rank)=>[rank,p.name,p.dept,ttDate(p.startedAt),ttDate(p.finishedAt)||"Not completed",p.score,p.correct,p.total,p.timeTaken??"",p.status==="finished"?"Finished":"Not finished",homeTime(p.startedAt),homeTime(p.finishedAt),p.tz,p.flags.map(f=>FLAG_TEXT[f]||f).join("; ")];
+  return[DOOR_HEAD,...done.map((p,i)=>row(p,i+1)),...open.map(p=>row(p,""))];
+}
+function doorSheetName(d){return("Door "+d.n+" "+d.title).replace(/[\[\]:*?\/\\']/g,"").slice(0,31)}
+async function exportDoorXlsx(d){
+  const msg=$("#xlsDoorMsg");msg.textContent="Preparing the Excel file…";
+  try{await loadXlsx()}catch(e){msg.textContent="The Excel tool didn't load. Check your connection and try again.";return}
+  const rows=doorSheetRows(d,allPlays()),done=rows.slice(1).filter(r=>r[0]!=="").length;
+  const info=[["Christmas Blitz · Door "+d.n+": "+d.title],["Game date: "+d.date+" · Entries: "+(rows.length-1)+" ("+done+" finished) · Downloaded: "+homeTime(Date.now())+" (TT time)"],[]];
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet([...info,...rows]);ws["!cols"]=DOOR_COLS.map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,doorSheetName(d));
+  const slug=d.title.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+  const fname="christmas-blitz-door-"+d.n+"-"+slug+"-"+new Date().toISOString().slice(0,10)+".xlsx";
+  try{XLSX.writeFile(wb,fname);msg.textContent="Downloaded "+fname}catch(e){msg.textContent="The download didn't start. Please try again."}
+}
 async function exportXlsx(){
   const msg=$("#xlsMsg");msg.textContent="Preparing the Excel file…";
   try{await loadXlsx()}catch(e){msg.textContent="The Excel tool didn't load. Check your connection and try again.";return}
@@ -1260,6 +1281,7 @@ async function exportXlsx(){
     ...plays.sort((a,b)=>a.door-b.door||rankSort(a,b)).map(p=>[p.door,p.game,doorDate(p.door),p.name,p.dept,ttDate(p.startedAt),ttDate(p.finishedAt)||"Not completed",p.score,p.correct,p.total,p.timeTaken??"",p.status==="finished"?"Finished":"Not finished",homeTime(p.startedAt),homeTime(p.finishedAt),p.tz,p.flags.map(f=>FLAG_TEXT[f]||f).join("; ")])],
     [6,30,12,28,24,16,19,14,9,8,14,13,22,22,22,36],"All Entries");
   sheet([["Door","Game","Full Name","Department","Date Played (TT)","Date Completed (TT)",REWARD,"Why it needs checking"],...chk.map(x=>[x.p.door,x.p.game,x.p.name,x.p.dept,ttDate(x.p.startedAt),ttDate(x.p.finishedAt)||"Not completed",x.p.score,x.why])],[6,30,28,24,16,19,14,50],"Needs Checking");
+  DOORS.forEach(d=>{const rows=doorSheetRows(d,plays);if(rows.length>1)sheet(rows,DOOR_COLS,doorSheetName(d))});
   const fname=`christmas-blitz-results-${new Date().toISOString().slice(0,10)}.xlsx`;
   try{XLSX.writeFile(wb,fname);msg.textContent="Downloaded "+fname}catch(e){msg.textContent="The download didn't start. Please try again."}
 }
